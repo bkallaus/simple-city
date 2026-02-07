@@ -240,6 +240,22 @@ class CityGrid {
 // Init Game State
 const city = new CityGrid(CONFIG.gridSize);
 
+// New Game State Logic
+const gameState = {
+    nextTier: 1,
+    isGameOver: false,
+    isBusy: false
+};
+
+function generateNextTier() {
+    // Weighted random: 70% Tier 1, 30% Tier 2
+    return Math.random() < 0.7 ? 1 : 2;
+}
+
+// Initial Generation
+gameState.nextTier = generateNextTier();
+updateNextTierUI();
+
 // Helper: Convert Grid Index to World Position
 function gridToWorld(x, z) {
     const offset = (CONFIG.gridSize * CONFIG.tileSize) / 2 - (CONFIG.tileSize / 2);
@@ -284,42 +300,162 @@ function spawnVisual(x, z, tier) {
 }
 
 // THE HEARTBEAT
-function gameTick() {
-    // 1. Check for Merges
-    const cluster = city.findMergeCluster();
+// function gameTick() {
+//     // 1. Check for Merges
+//     const cluster = city.findMergeCluster();
 
-    if (cluster) {
-        // Merge Logic
-        const survivor = cluster[0]; // Logic: First one stays
-        const newTier = survivor.tier + 1;
+//     if (cluster) {
+//         // Merge Logic
+//         const survivor = cluster[0]; // Logic: First one stays
+//         const newTier = survivor.tier + 1;
+
+//         // Remove all from data & visual
+//         cluster.forEach(b => city.remove(b.x, b.z));
+
+//         // Delay spawn of upgrade to let shrink animation play
+//         setTimeout(() => {
+//             city.place(survivor.x, survivor.z, newTier);
+//             spawnVisual(survivor.x, survivor.z, newTier);
+//         }, 300);
+
+//     } else {
+//         // 2. Spawn Logic
+//         const empties = city.getEmpties();
+//         if (empties.length === 0) {
+//             // Game Over / Reset
+//             console.log("Grid Full! Resetting...");
+//             // Optional: city = new CityGrid(5); // Reset logic
+//             return;
+//         }
+
+//         const spot = empties[Math.floor(Math.random() * empties.length)];
+//         city.place(spot.x, spot.z, 1); // Always spawn Tier 1
+//         spawnVisual(spot.x, spot.z, 1);
+//     }
+// }
+
+// Start Timer
+// setInterval(gameTick, CONFIG.tickRate);
+
+// --- 6. INTERACTION ---
+
+// Raycaster & Mouse
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// Cursor Visual
+const cursorGeo = new THREE.BoxGeometry(CONFIG.tileSize, 0.2, CONFIG.tileSize);
+const cursorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, opacity: 0.5, transparent: true });
+const cursor = new THREE.Mesh(cursorGeo, cursorMat);
+scene.add(cursor);
+cursor.visible = false; // Initially hidden
+
+// Event Listeners
+window.addEventListener('mousemove', (event) => {
+    // Normalize mouse position
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Raycast
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(platform);
+
+    if (intersects.length > 0) {
+        const point = intersects[0].point;
+
+        // Convert to Grid Coords
+        const offset = (CONFIG.gridSize * CONFIG.tileSize) / 2 - (CONFIG.tileSize / 2);
+        const gx = Math.round((point.x + offset) / CONFIG.tileSize);
+        const gz = Math.round((point.z + offset) / CONFIG.tileSize);
+
+        // Snap Cursor
+        if (city.isValid(gx, gz)) {
+            const worldPos = gridToWorld(gx, gz);
+            cursor.position.set(worldPos.x, 0.1, worldPos.z);
+            cursor.visible = true;
+        } else {
+            cursor.visible = false;
+        }
+    } else {
+        cursor.visible = false;
+    }
+});
+
+// Click Listener
+window.addEventListener('mousedown', (event) => {
+    if (gameState.isGameOver || gameState.isBusy) return;
+
+    // Reuse mouse coordinates from mousemove if available, or update them
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(platform);
+
+    if (intersects.length > 0) {
+        const point = intersects[0].point;
+        const offset = (CONFIG.gridSize * CONFIG.tileSize) / 2 - (CONFIG.tileSize / 2);
+        const gx = Math.round((point.x + offset) / CONFIG.tileSize);
+        const gz = Math.round((point.z + offset) / CONFIG.tileSize);
+
+        if (city.isValid(gx, gz) && city.grid[gx][gz] === null) {
+            // Place Building
+            city.place(gx, gz, gameState.nextTier);
+            spawnVisual(gx, gz, gameState.nextTier);
+
+            // Check Merges
+            resolveMerges(gx, gz);
+
+            // Next Turn
+            gameState.nextTier = generateNextTier();
+            updateNextTierUI();
+
+            console.log("Next Tier:", gameState.nextTier);
+        }
+    }
+});
+
+function resolveMerges(x, z) {
+    if (!city.isValid(x, z) || city.grid[x][z] === null) {
+        gameState.isBusy = false;
+        return;
+    }
+
+    const currentTier = city.grid[x][z].tier;
+    const cluster = city.floodFill(x, z, currentTier, new Set());
+
+    if (cluster.length >= 3) {
+        console.log("Merge!", cluster.length, "items of Tier", currentTier);
+        gameState.isBusy = true;
 
         // Remove all from data & visual
         cluster.forEach(b => city.remove(b.x, b.z));
 
         // Delay spawn of upgrade to let shrink animation play
         setTimeout(() => {
-            city.place(survivor.x, survivor.z, newTier);
-            spawnVisual(survivor.x, survivor.z, newTier);
-        }, 300);
+            const newTier = currentTier + 1;
+            city.place(x, z, newTier);
+            spawnVisual(x, z, newTier);
 
+            // Recursive check
+            resolveMerges(x, z);
+        }, 400);
     } else {
-        // 2. Spawn Logic
-        const empties = city.getEmpties();
-        if (empties.length === 0) {
-            // Game Over / Reset
-            console.log("Grid Full! Resetting...");
-            // Optional: city = new CityGrid(5); // Reset logic
-            return;
-        }
-
-        const spot = empties[Math.floor(Math.random() * empties.length)];
-        city.place(spot.x, spot.z, 1); // Always spawn Tier 1
-        spawnVisual(spot.x, spot.z, 1);
+        gameState.isBusy = false;
     }
 }
 
-// Start Timer
-setInterval(gameTick, CONFIG.tickRate);
+function updateNextTierUI() {
+    const nextTierEl = document.getElementById('next-tier');
+    if (nextTierEl) {
+        nextTierEl.innerText = gameState.nextTier;
+
+        // Update color based on tier palette
+        const t = Math.min(Math.max(gameState.nextTier, 1), 10);
+        const colorHex = PALETTE[t - 1];
+        nextTierEl.style.color = '#' + colorHex.toString(16).padStart(6, '0');
+    }
+}
 
 // Render Loop
 function animate() {
