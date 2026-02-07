@@ -47,6 +47,112 @@ scene.add(dirLight);
 
 // --- 3. ASSETS & FACTORY (VISUALS) ---
 
+// --- TEXTURE FACTORY ---
+const TextureFactory = {
+    createCanvas: function(width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        return canvas;
+    },
+
+    createTexture: function(drawFn) {
+        const canvas = this.createCanvas(256, 256);
+        const ctx = canvas.getContext('2d');
+        drawFn(ctx, 256, 256);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.magFilter = THREE.NearestFilter; // Keep it crisp
+        return tex;
+    },
+
+    // 1. Basic Grid (Windows)
+    grid: function(bgColor, lineColor) {
+        return this.createTexture((ctx, w, h) => {
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 8; // Thicker lines for readability
+            const step = 64;
+
+            // Draw Grid
+            for(let i=step; i<w; i+=step) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, h);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(w, i);
+                ctx.stroke();
+            }
+
+            // Border
+            ctx.strokeRect(0,0,w,h);
+        });
+    },
+
+    // 2. Residential (Door + Windows)
+    residential: function(wallColor, windowColor) {
+        return this.createTexture((ctx, w, h) => {
+            ctx.fillStyle = wallColor;
+            ctx.fillRect(0, 0, w, h);
+
+            // Windows
+            ctx.fillStyle = windowColor;
+            const pad = 40;
+            const winSize = 60;
+
+            // Top Left
+            ctx.fillRect(pad, pad, winSize, winSize);
+            // Top Right
+            ctx.fillRect(w - pad - winSize, pad, winSize, winSize);
+
+            // Door (Bottom Center)
+            ctx.fillStyle = "#3e2723"; // Dark Wood
+            ctx.fillRect((w/2) - 30, h - 100, 60, 100);
+        });
+    },
+
+    // 3. Commercial (Stripes/Glass)
+    commercial: function(baseColor, glassColor) {
+        return this.createTexture((ctx, w, h) => {
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.fillStyle = glassColor;
+            const numStripes = 3;
+            const stripeHeight = h / (numStripes * 2.5);
+
+            for(let i=1; i<=numStripes; i++) {
+                ctx.fillRect(20, i * stripeHeight * 2, w - 40, stripeHeight);
+            }
+        });
+    },
+
+    // 4. Ground (Paved/Grass)
+    ground: function() {
+        return this.createTexture((ctx, w, h) => {
+            ctx.fillStyle = "#88cc88"; // Grass Base
+            ctx.fillRect(0, 0, w, h);
+
+            // Noise / Texture
+            ctx.fillStyle = "#7abf7a"; // Slightly darker
+            for(let i=0; i<400; i++) {
+                const x = Math.random() * w;
+                const y = Math.random() * h;
+                const s = Math.random() * 6 + 2;
+                ctx.fillRect(x, y, s, s);
+            }
+
+            // Border (Grid Line)
+            ctx.strokeStyle = "#6fb56f";
+            ctx.lineWidth = 16;
+            ctx.strokeRect(0, 0, w, h);
+        });
+    }
+};
+
 // Color Palette
 const PALETTE = [
     0xff6b6b, // T1: Red
@@ -71,31 +177,75 @@ function createPlasticMat(colorHex) {
     });
 }
 
+// Texture Cache
+const TEXTURE_CACHE = {};
+
 // The Procedural Building Generator
 function createBuildingMesh(tier) {
     // Clamp tier to 1-10
     const t = Math.min(Math.max(tier, 1), 10);
-    const color = PALETTE[t - 1];
-    const mat = createPlasticMat(color);
+
+    // Generate or Fetch Texture
+    if (!TEXTURE_CACHE[t]) {
+        const colorHex = PALETTE[t - 1];
+        const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+
+        if (t <= 3) {
+            TEXTURE_CACHE[t] = TextureFactory.residential(colorStr, '#feffdf'); // Light Yellow Windows
+        } else if (t <= 6) {
+            TEXTURE_CACHE[t] = TextureFactory.commercial(colorStr, '#e0f7fa'); // Cyan Glass
+        } else {
+            TEXTURE_CACHE[t] = TextureFactory.grid(colorStr, '#ffffff'); // High tech white lines
+        }
+    }
+
+    const mat = new THREE.MeshStandardMaterial({
+        map: TEXTURE_CACHE[t],
+        roughness: 0.3,
+        metalness: 0.1
+    });
+
+    // Roof Material (Darker shade of base color)
+    const roofColor = new THREE.Color(PALETTE[t-1]).multiplyScalar(0.6);
+    const roofMat = new THREE.MeshStandardMaterial({
+        color: roofColor,
+        roughness: 0.6,
+        flatShading: true
+    });
+
+    // Materials Arrays
+    // Box: Right, Left, Top, Bottom, Front, Back
+    const boxMaterials = [mat, mat, roofMat, mat, mat, mat];
+    // Cylinder: Side, Top, Bottom
+    const cylMaterials = [mat, roofMat, roofMat];
+
     let mesh;
 
     // Procedural Shapes based on Tier
     if (t === 1) {
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), mat);
+        // Small House
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), boxMaterials);
         mesh.position.y = 0.25;
     }
     else if (t === 2) {
-        mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 8), mat);
+        // Tall House / Apartment
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.6), boxMaterials);
         mesh.position.y = 0.4;
     }
     else if (t === 3) {
-        mesh = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1, 4), mat);
-        mesh.position.y = 0.5;
+        // Complex House
+        mesh = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), boxMaterials);
+        base.position.y = 0.3;
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.4, 4), createPlasticMat(0x444444));
+        roof.position.y = 0.8;
+        roof.rotation.y = Math.PI/4;
+        mesh.add(base, roof);
     }
     else if (t >= 4 && t <= 6) {
         // Tower Block
         mesh = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1 + (t*0.2), 0.6), mat);
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1 + (t*0.2), 0.6), boxMaterials);
         base.position.y = (1 + (t*0.2)) / 2;
         const top = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.4), createPlasticMat(0xffffff));
         top.position.y = 1 + (t*0.2) + 0.1;
@@ -104,9 +254,10 @@ function createBuildingMesh(tier) {
     else {
         // Skyscraper / Rocket
         mesh = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 1 + (t*0.3), 6), mat);
+        // Use Cylinder but increase segments for smoother texture look
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 1 + (t*0.3), 16), cylMaterials);
         body.position.y = (1 + (t*0.3)) / 2;
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 16), createPlasticMat(0xffffff));
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 16, 16), createPlasticMat(0xffffff));
         ring.position.y = (t*0.2);
         ring.rotation.x = Math.PI / 2;
         mesh.add(body, ring);
@@ -271,7 +422,18 @@ const platformGeo = new THREE.BoxGeometry(
     0.2,
     CONFIG.gridSize * CONFIG.tileSize
 );
-const platformMat = new THREE.MeshLambertMaterial({ color: 0x88cc88 }); // Grass Green
+
+// Ground Texture
+const groundTex = TextureFactory.ground();
+groundTex.wrapS = THREE.RepeatWrapping;
+groundTex.wrapT = THREE.RepeatWrapping;
+groundTex.repeat.set(CONFIG.gridSize, CONFIG.gridSize);
+
+const platformMat = new THREE.MeshStandardMaterial({
+    map: groundTex,
+    roughness: 0.8
+});
+
 const platform = new THREE.Mesh(platformGeo, platformMat);
 platform.position.y = -0.1;
 platform.receiveShadow = true;
