@@ -1,0 +1,340 @@
+/**
+ * POP CITY - MASTER ENGINE
+ * Phase 1-7 Integrated
+ */
+
+// --- 1. CONFIGURATION ---
+const CONFIG = {
+    gridSize: 5,         // 5x5 Grid
+    tileSize: 1.2,       // Spacing between buildings
+    tickRate: 1500,      // Speed of the game (ms)
+    cameraDist: 8        // Zoom level
+};
+
+// --- 2. SCENE SETUP (THREE.JS) ---
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB); // Sky Blue
+
+// Orthographic Camera for Isometric View
+const aspect = window.innerWidth / window.innerHeight;
+const d = CONFIG.cameraDist;
+const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+
+// The "True Isometric" Angle: Look from corner
+camera.position.set(20, 20, 20);
+camera.lookAt(scene.position);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true; // Enable Shadows
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+dirLight.position.set(10, 20, 0); // Sun angle
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.left = -10;
+dirLight.shadow.camera.right = 10;
+dirLight.shadow.camera.top = 10;
+dirLight.shadow.camera.bottom = -10;
+scene.add(dirLight);
+
+// --- 3. ASSETS & FACTORY (VISUALS) ---
+
+// Color Palette
+const PALETTE = [
+    0xff6b6b, // T1: Red
+    0x4ecdc4, // T2: Teal
+    0xffd93d, // T3: Yellow
+    0x1a535c, // T4: Dark Teal
+    0xff9f43, // T5: Orange
+    0x5f27cd, // T6: Purple
+    0x54a0ff, // T7: Light Blue
+    0x2e86de, // T8: Darker Blue
+    0xee5253, // T9: Red-Orange
+    0xfeca57  // T10: Gold
+];
+
+// Material Factory
+function createPlasticMat(colorHex) {
+    return new THREE.MeshStandardMaterial({
+        color: colorHex,
+        roughness: 0.3,
+        metalness: 0.1,
+        flatShading: true
+    });
+}
+
+// The Procedural Building Generator
+function createBuildingMesh(tier) {
+    // Clamp tier to 1-10
+    const t = Math.min(Math.max(tier, 1), 10);
+    const color = PALETTE[t - 1];
+    const mat = createPlasticMat(color);
+    let mesh;
+
+    // Procedural Shapes based on Tier
+    if (t === 1) {
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), mat);
+        mesh.position.y = 0.25;
+    }
+    else if (t === 2) {
+        mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 8), mat);
+        mesh.position.y = 0.4;
+    }
+    else if (t === 3) {
+        mesh = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1, 4), mat);
+        mesh.position.y = 0.5;
+    }
+    else if (t >= 4 && t <= 6) {
+        // Tower Block
+        mesh = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1 + (t*0.2), 0.6), mat);
+        base.position.y = (1 + (t*0.2)) / 2;
+        const top = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.4), createPlasticMat(0xffffff));
+        top.position.y = 1 + (t*0.2) + 0.1;
+        mesh.add(base, top);
+    }
+    else {
+        // Skyscraper / Rocket
+        mesh = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 1 + (t*0.3), 6), mat);
+        body.position.y = (1 + (t*0.3)) / 2;
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 16), createPlasticMat(0xffffff));
+        ring.position.y = (t*0.2);
+        ring.rotation.x = Math.PI / 2;
+        mesh.add(body, ring);
+    }
+
+    // Enable Shadows for all parts
+    mesh.traverse((c) => {
+        if(c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
+    });
+
+    return mesh;
+}
+
+// --- 4. GAME LOGIC (THE BRAIN) ---
+
+class CityGrid {
+    constructor(size) {
+        this.size = size;
+        this.grid = Array(size).fill().map(() => Array(size).fill(null));
+        this.meshGrid = Array(size).fill().map(() => Array(size).fill(null)); // Stores 3D objects
+        this.score = 0;
+    }
+
+    // Check if coordinate is valid
+    isValid(x, z) {
+        return x >= 0 && x < this.size && z >= 0 && z < this.size;
+    }
+
+    // Add building to data
+    place(x, z, tier) {
+        if (!this.isValid(x, z) || this.grid[x][z] !== null) return null;
+
+        // Data
+        this.grid[x][z] = { tier: tier, id: Date.now() + Math.random() };
+        this.score += Math.pow(tier, 2) * 10; // Exponential score
+        this.updateUI();
+
+        return this.grid[x][z];
+    }
+
+    // Remove building from data and scene
+    remove(x, z) {
+        if (!this.isValid(x, z)) return;
+        this.grid[x][z] = null;
+
+        if (this.meshGrid[x][z]) {
+            const mesh = this.meshGrid[x][z];
+            // Shrink animation before deleting
+            gsap.to(mesh.scale, {
+                x: 0, y: 0, z: 0,
+                duration: 0.3,
+                onComplete: () => scene.remove(mesh)
+            });
+            this.meshGrid[x][z] = null;
+        }
+    }
+
+    // Find all empty tiles
+    getEmpties() {
+        let empties = [];
+        for (let x = 0; x < this.size; x++) {
+            for (let z = 0; z < this.size; z++) {
+                if (!this.grid[x][z]) empties.push({ x, z });
+            }
+        }
+        return empties;
+    }
+
+    // Flood Fill to find connected buildings of same tier
+    findMergeCluster() {
+        let visited = new Set();
+        let bestCluster = [];
+
+        for (let x = 0; x < this.size; x++) {
+            for (let z = 0; z < this.size; z++) {
+                if (!this.grid[x][z]) continue;
+
+                let key = `${x},${z}`;
+                if (visited.has(key)) continue;
+
+                let cluster = this.floodFill(x, z, this.grid[x][z].tier, visited);
+
+                // We need at least 3 to merge
+                if (cluster.length >= 3) {
+                    // Prioritize higher tier merges
+                    if (bestCluster.length === 0 || cluster[0].tier > bestCluster[0].tier) {
+                        bestCluster = cluster;
+                    }
+                }
+            }
+        }
+        return bestCluster.length > 0 ? bestCluster : null;
+    }
+
+    floodFill(x, z, tier, visited) {
+        let cluster = [];
+        let stack = [{x, z}];
+
+        while(stack.length > 0) {
+            let p = stack.pop();
+            let key = `${p.x},${p.z}`;
+
+            if (!this.isValid(p.x, p.z)) continue;
+            if (visited.has(key)) continue;
+
+            let cell = this.grid[p.x][p.z];
+            if (cell && cell.tier === tier) {
+                visited.add(key);
+                cluster.push(cell); // Push the data object
+                // Add coordinates to data object for reference
+                cell.x = p.x;
+                cell.z = p.z;
+
+                // Check Neighbors
+                stack.push({x: p.x + 1, z: p.z});
+                stack.push({x: p.x - 1, z: p.z});
+                stack.push({x: p.x, z: p.z + 1});
+                stack.push({x: p.x, z: p.z - 1});
+            }
+        }
+        return cluster;
+    }
+
+    updateUI() {
+        document.getElementById('pop-count').innerText = this.score;
+    }
+}
+
+// --- 5. EXECUTION & LOOP ---
+
+// Init Game State
+const city = new CityGrid(CONFIG.gridSize);
+
+// Helper: Convert Grid Index to World Position
+function gridToWorld(x, z) {
+    const offset = (CONFIG.gridSize * CONFIG.tileSize) / 2 - (CONFIG.tileSize / 2);
+    return {
+        x: (x * CONFIG.tileSize) - offset,
+        z: (z * CONFIG.tileSize) - offset
+    };
+}
+
+// Create the Ground Platform
+const platformGeo = new THREE.BoxGeometry(
+    CONFIG.gridSize * CONFIG.tileSize,
+    0.2,
+    CONFIG.gridSize * CONFIG.tileSize
+);
+const platformMat = new THREE.MeshLambertMaterial({ color: 0x88cc88 }); // Grass Green
+const platform = new THREE.Mesh(platformGeo, platformMat);
+platform.position.y = -0.1;
+platform.receiveShadow = true;
+scene.add(platform);
+
+// Helper: Spawn Visual
+function spawnVisual(x, z, tier) {
+    // Clean up existing if any (safety check)
+    if (city.meshGrid[x][z]) scene.remove(city.meshGrid[x][z]);
+
+    const mesh = createBuildingMesh(tier);
+    const pos = gridToWorld(x, z);
+    mesh.position.set(pos.x, mesh.position.y, pos.z);
+
+    // Start invisible
+    mesh.scale.set(0, 0, 0);
+    scene.add(mesh);
+    city.meshGrid[x][z] = mesh;
+
+    // POP Animation
+    gsap.to(mesh.scale, {
+        x: 1, y: 1, z: 1,
+        duration: 0.6,
+        ease: "elastic.out(1, 0.5)"
+    });
+}
+
+// THE HEARTBEAT
+function gameTick() {
+    // 1. Check for Merges
+    const cluster = city.findMergeCluster();
+
+    if (cluster) {
+        // Merge Logic
+        const survivor = cluster[0]; // Logic: First one stays
+        const newTier = survivor.tier + 1;
+
+        // Remove all from data & visual
+        cluster.forEach(b => city.remove(b.x, b.z));
+
+        // Delay spawn of upgrade to let shrink animation play
+        setTimeout(() => {
+            city.place(survivor.x, survivor.z, newTier);
+            spawnVisual(survivor.x, survivor.z, newTier);
+        }, 300);
+
+    } else {
+        // 2. Spawn Logic
+        const empties = city.getEmpties();
+        if (empties.length === 0) {
+            // Game Over / Reset
+            console.log("Grid Full! Resetting...");
+            // Optional: city = new CityGrid(5); // Reset logic
+            return;
+        }
+
+        const spot = empties[Math.floor(Math.random() * empties.length)];
+        city.place(spot.x, spot.z, 1); // Always spawn Tier 1
+        spawnVisual(spot.x, spot.z, 1);
+    }
+}
+
+// Start Timer
+setInterval(gameTick, CONFIG.tickRate);
+
+// Render Loop
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+animate();
+
+// Handle Window Resize
+window.addEventListener('resize', () => {
+    const aspect = window.innerWidth / window.innerHeight;
+    camera.left = -d * aspect;
+    camera.right = d * aspect;
+    camera.top = d;
+    camera.bottom = -d;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
