@@ -299,6 +299,59 @@ function spawnVisual(x, z, tier) {
     });
 }
 
+// Helper: Particle Explosion
+const particleGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+
+function createParticleExplosion(x, z, colorHex) {
+    const pos = gridToWorld(x, z);
+    const particleCount = 12;
+    const material = new THREE.MeshBasicMaterial({ color: colorHex });
+
+    let activeParticles = particleCount;
+
+    for (let i = 0; i < particleCount; i++) {
+        const mesh = new THREE.Mesh(particleGeometry, material);
+        mesh.position.set(pos.x, 0.5, pos.z);
+
+        // Random velocity
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = Math.random() * 2 + 1; // Speed
+        const targetX = pos.x + Math.cos(angle) * velocity;
+        const targetZ = pos.z + Math.sin(angle) * velocity;
+        const targetY = Math.random() * 2 + 0.5;
+
+        scene.add(mesh);
+
+        gsap.to(mesh.position, {
+            x: targetX,
+            y: targetY,
+            z: targetZ,
+            duration: 0.6,
+            ease: "power2.out"
+        });
+
+        gsap.to(mesh.rotation, {
+            x: Math.random() * 10,
+            y: Math.random() * 10,
+            duration: 0.6
+        });
+
+        gsap.to(mesh.scale, {
+            x: 0,
+            y: 0,
+            z: 0,
+            duration: 0.6,
+            onComplete: () => {
+                scene.remove(mesh);
+                activeParticles--;
+                if (activeParticles === 0) {
+                    material.dispose();
+                }
+            }
+        });
+    }
+}
+
 // THE HEARTBEAT
 // function gameTick() {
 //     // 1. Check for Merges
@@ -428,18 +481,81 @@ function resolveMerges(x, z) {
         console.log("Merge!", cluster.length, "items of Tier", currentTier);
         gameState.isBusy = true;
 
-        // Remove all from data & visual
-        cluster.forEach(b => city.remove(b.x, b.z));
+        // 1. Identify Center and Mergers
+        const center = cluster.find(b => b.x === x && b.z === z);
+        const mergers = cluster.filter(b => b !== center);
 
-        // Delay spawn of upgrade to let shrink animation play
-        setTimeout(() => {
-            const newTier = currentTier + 1;
-            city.place(x, z, newTier);
-            spawnVisual(x, z, newTier);
+        // Target World Position
+        const targetPos = gridToWorld(x, z);
 
-            // Recursive check
-            resolveMerges(x, z);
-        }, 400);
+        // 2. Clear Grid Data (Logic)
+        cluster.forEach(b => {
+            city.grid[b.x][b.z] = null;
+        });
+
+        // 3. Animate Mergers
+        let completed = 0;
+        const total = mergers.length;
+
+        // Handle Center Visual (Static until end)
+        // We need to keep a reference to remove it later
+        let centerMesh = null;
+        if (center) {
+            centerMesh = city.meshGrid[center.x][center.z];
+            city.meshGrid[center.x][center.z] = null;
+        }
+
+        const checkDone = () => {
+            completed++;
+            if (completed >= total) {
+                // All mergers arrived
+                if (centerMesh) scene.remove(centerMesh);
+
+                // Particles
+                // Use the color of the tier being merged
+                const colorHex = PALETTE[Math.min(currentTier, 10) - 1] || 0xffffff;
+                createParticleExplosion(x, z, colorHex);
+
+                // Spawn Upgrade
+                const newTier = currentTier + 1;
+                city.place(x, z, newTier);
+                spawnVisual(x, z, newTier);
+
+                // Recursive Check
+                setTimeout(() => {
+                    resolveMerges(x, z);
+                }, 100);
+            }
+        };
+
+        mergers.forEach(b => {
+            const mesh = city.meshGrid[b.x][b.z];
+            city.meshGrid[b.x][b.z] = null; // Detach visual
+
+            if (mesh) {
+                // Animate position
+                gsap.to(mesh.position, {
+                    x: targetPos.x,
+                    z: targetPos.z,
+                    duration: 0.4,
+                    ease: "back.in(1.7)"
+                });
+
+                // Animate scale/disappear
+                 gsap.to(mesh.scale, {
+                    x: 0, y: 0, z: 0,
+                    duration: 0.4,
+                    delay: 0.1,
+                    onComplete: () => {
+                        scene.remove(mesh);
+                        checkDone();
+                    }
+                });
+            } else {
+                checkDone();
+            }
+        });
+
     } else {
         gameState.isBusy = false;
     }
