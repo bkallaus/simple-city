@@ -8,7 +8,7 @@ const CONFIG = {
     gridSize: 10,        // 10x10 Grid
     tileSize: 1.2,       // Spacing between buildings
     tickRate: 1500,      // Speed of the game (ms)
-    cameraDist: 15       // Zoom level - Increased for larger grid
+    cameraDist: 7       // Zoom level - Increased for larger grid
 };
 
 // --- 2. SCENE SETUP (THREE.JS) ---
@@ -749,7 +749,7 @@ class Avatar {
         // Movement State
         this.isMoving = false;
         this.target = null;
-        this.speed = 2.0; // Units per second
+        this.speed = 0.5; // Units per second
     }
 
     update(dt) {
