@@ -5,10 +5,10 @@
 
 // --- 1. CONFIGURATION ---
 const CONFIG = {
-    gridSize: 5,         // 5x5 Grid
+    gridSize: 10,        // 10x10 Grid
     tileSize: 1.2,       // Spacing between buildings
     tickRate: 1500,      // Speed of the game (ms)
-    cameraDist: 8        // Zoom level
+    cameraDist: 15       // Zoom level - Increased for larger grid
 };
 
 // --- 2. SCENE SETUP (THREE.JS) ---
@@ -49,14 +49,14 @@ scene.add(dirLight);
 
 // --- TEXTURE FACTORY ---
 const TextureFactory = {
-    createCanvas: function(width, height) {
+    createCanvas: function (width, height) {
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
         return canvas;
     },
 
-    createTexture: function(drawFn) {
+    createTexture: function (drawFn) {
         const canvas = this.createCanvas(256, 256);
         const ctx = canvas.getContext('2d');
         drawFn(ctx, 256, 256);
@@ -66,7 +66,7 @@ const TextureFactory = {
     },
 
     // 1. Basic Grid (Windows)
-    grid: function(bgColor, lineColor) {
+    grid: function (bgColor, lineColor) {
         return this.createTexture((ctx, w, h) => {
             ctx.fillStyle = bgColor;
             ctx.fillRect(0, 0, w, h);
@@ -75,7 +75,7 @@ const TextureFactory = {
             const step = 64;
 
             // Draw Grid
-            for(let i=step; i<w; i+=step) {
+            for (let i = step; i < w; i += step) {
                 ctx.beginPath();
                 ctx.moveTo(i, 0);
                 ctx.lineTo(i, h);
@@ -88,12 +88,12 @@ const TextureFactory = {
             }
 
             // Border
-            ctx.strokeRect(0,0,w,h);
+            ctx.strokeRect(0, 0, w, h);
         });
     },
 
     // 2. Residential (Door + Windows)
-    residential: function(wallColor, windowColor) {
+    residential: function (wallColor, windowColor) {
         return this.createTexture((ctx, w, h) => {
             ctx.fillStyle = wallColor;
             ctx.fillRect(0, 0, w, h);
@@ -110,12 +110,12 @@ const TextureFactory = {
 
             // Door (Bottom Center)
             ctx.fillStyle = "#3e2723"; // Dark Wood
-            ctx.fillRect((w/2) - 30, h - 100, 60, 100);
+            ctx.fillRect((w / 2) - 30, h - 100, 60, 100);
         });
     },
 
     // 3. Commercial (Stripes/Glass)
-    commercial: function(baseColor, glassColor) {
+    commercial: function (baseColor, glassColor) {
         return this.createTexture((ctx, w, h) => {
             ctx.fillStyle = baseColor;
             ctx.fillRect(0, 0, w, h);
@@ -124,21 +124,21 @@ const TextureFactory = {
             const numStripes = 3;
             const stripeHeight = h / (numStripes * 2.5);
 
-            for(let i=1; i<=numStripes; i++) {
+            for (let i = 1; i <= numStripes; i++) {
                 ctx.fillRect(20, i * stripeHeight * 2, w - 40, stripeHeight);
             }
         });
     },
 
     // 4. Ground (Paved/Grass)
-    ground: function() {
+    ground: function () {
         return this.createTexture((ctx, w, h) => {
             ctx.fillStyle = "#88cc88"; // Grass Base
             ctx.fillRect(0, 0, w, h);
 
             // Noise / Texture
             ctx.fillStyle = "#7abf7a"; // Slightly darker
-            for(let i=0; i<400; i++) {
+            for (let i = 0; i < 400; i++) {
                 const x = Math.random() * w;
                 const y = Math.random() * h;
                 const s = Math.random() * 6 + 2;
@@ -148,6 +148,47 @@ const TextureFactory = {
             // Border (Grid Line)
             ctx.strokeStyle = "#6fb56f";
             ctx.lineWidth = 16;
+            ctx.strokeRect(0, 0, w, h);
+        });
+    },
+
+    // 5. Road (Asphalt)
+    road: function () {
+        return this.createTexture((ctx, w, h) => {
+            // Asphalt Base
+            ctx.fillStyle = "#555555";
+            ctx.fillRect(0, 0, w, h);
+
+            // Noise
+            ctx.fillStyle = "#666666";
+            for (let i = 0; i < 500; i++) {
+                const x = Math.random() * w;
+                const y = Math.random() * h;
+                const s = Math.random() * 3 + 1;
+                ctx.fillRect(x, y, s, s);
+            }
+
+            // Lane Markings (Dashed White Line)
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 8;
+            ctx.setLineDash([20, 20]);
+            ctx.beginPath();
+            ctx.moveTo(w / 2, 0);
+            ctx.lineTo(w / 2, h);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset
+
+            // Cross street hint (horizontal light line)
+            ctx.strokeStyle = "#666666";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2);
+            ctx.lineTo(w, h / 2);
+            ctx.stroke();
+
+            // Border
+            ctx.strokeStyle = "#444444";
+            ctx.lineWidth = 4;
             ctx.strokeRect(0, 0, w, h);
         });
     }
@@ -190,13 +231,28 @@ function createBuildingMesh(tier) {
         const colorHex = PALETTE[t - 1];
         const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
 
-        if (t <= 3) {
+        if (t === -1) {
+            TEXTURE_CACHE[t] = TextureFactory.road();
+        } else if (t <= 3) {
             TEXTURE_CACHE[t] = TextureFactory.residential(colorStr, '#feffdf'); // Light Yellow Windows
         } else if (t <= 6) {
             TEXTURE_CACHE[t] = TextureFactory.commercial(colorStr, '#e0f7fa'); // Cyan Glass
         } else {
             TEXTURE_CACHE[t] = TextureFactory.grid(colorStr, '#ffffff'); // High tech white lines
         }
+    }
+
+    if (t === -1) {
+        // Road Mesh (Flat plane slightly above ground)
+        const roadMat = new THREE.MeshStandardMaterial({
+            map: TEXTURE_CACHE[t],
+            roughness: 0.9,
+            metalness: 0.0
+        });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.05, 1), roadMat);
+        mesh.position.y = 0.025;
+        mesh.receiveShadow = true;
+        return mesh;
     }
 
     const mat = new THREE.MeshStandardMaterial({
@@ -206,7 +262,7 @@ function createBuildingMesh(tier) {
     });
 
     // Roof Material (Darker shade of base color)
-    const roofColor = new THREE.Color(PALETTE[t-1]).multiplyScalar(0.6);
+    const roofColor = new THREE.Color(PALETTE[t - 1]).multiplyScalar(0.6);
     const roofMat = new THREE.MeshStandardMaterial({
         color: roofColor,
         roughness: 0.6,
@@ -239,33 +295,33 @@ function createBuildingMesh(tier) {
         base.position.y = 0.3;
         const roof = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.4, 4), createPlasticMat(0x444444));
         roof.position.y = 0.8;
-        roof.rotation.y = Math.PI/4;
+        roof.rotation.y = Math.PI / 4;
         mesh.add(base, roof);
     }
     else if (t >= 4 && t <= 6) {
         // Tower Block
         mesh = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1 + (t*0.2), 0.6), boxMaterials);
-        base.position.y = (1 + (t*0.2)) / 2;
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1 + (t * 0.2), 0.6), boxMaterials);
+        base.position.y = (1 + (t * 0.2)) / 2;
         const top = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.4), createPlasticMat(0xffffff));
-        top.position.y = 1 + (t*0.2) + 0.1;
+        top.position.y = 1 + (t * 0.2) + 0.1;
         mesh.add(base, top);
     }
     else {
         // Skyscraper / Rocket
         mesh = new THREE.Group();
         // Use Cylinder but increase segments for smoother texture look
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 1 + (t*0.3), 16), cylMaterials);
-        body.position.y = (1 + (t*0.3)) / 2;
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 1 + (t * 0.3), 16), cylMaterials);
+        body.position.y = (1 + (t * 0.3)) / 2;
         const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 16, 16), createPlasticMat(0xffffff));
-        ring.position.y = (t*0.2);
+        ring.position.y = (t * 0.2);
         ring.rotation.x = Math.PI / 2;
         mesh.add(body, ring);
     }
 
     // Enable Shadows for all parts
     mesh.traverse((c) => {
-        if(c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
+        if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
     });
 
     return mesh;
@@ -288,12 +344,26 @@ class CityGrid {
 
     // Add building to data
     place(x, z, tier) {
-        if (!this.isValid(x, z) || this.grid[x][z] !== null) return null;
+        if (!this.isValid(x, z)) return null;
+
+        // If it's a road, we can overwrite it. If it's a building, we can't.
+        if (this.grid[x][z] !== null && this.grid[x][z].tier !== -1) return null;
+
+        // Remove visualization if overwriting road
+        if (this.meshGrid[x][z]) {
+            scene.remove(this.meshGrid[x][z]);
+            this.meshGrid[x][z] = null;
+        }
 
         // Data
         this.grid[x][z] = { tier: tier, id: Date.now() + Math.random() };
-        this.score += Math.pow(tier, 2) * 10; // Exponential score
-        this.updateUI();
+
+        // Only score if it's a building (tier > 0)
+        if (tier > 0) {
+            this.score += Math.pow(tier, 2) * 10; // Exponential score
+            this.updateUI();
+            // this.updateRoads(); // Check for new roads
+        }
 
         return this.grid[x][z];
     }
@@ -301,6 +371,12 @@ class CityGrid {
     // Remove building from data and scene
     remove(x, z) {
         if (!this.isValid(x, z)) return;
+
+        // Don't remove roads unless forced (tier -1)
+        // Actually, remove serves game logic (merging), so we should remove roads 
+        // if they are part of the merge? No, merges are tier-based. 
+        // Roads are tier -1.
+
         this.grid[x][z] = null;
 
         if (this.meshGrid[x][z]) {
@@ -308,10 +384,46 @@ class CityGrid {
             // Shrink animation before deleting
             gsap.to(mesh.scale, {
                 x: 0, y: 0, z: 0,
-                duration: 0.3,
+                duration: 0.1,
                 onComplete: () => scene.remove(mesh)
             });
             this.meshGrid[x][z] = null;
+        }
+
+        // After removing a building, we might need to update roads? 
+        // Or maybe just leave them until something overwrites them?
+        // Let's leave them for now, it's simpler.
+    }
+
+    updateRoads() {
+        // Scan for empty spots that should be roads
+        // Rule: Empty spot with at least 1 building neighbor becomes a road?
+        // Or: Empty spot connected to existing road or building?
+
+        const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+        for (let x = 0; x < this.size; x++) {
+            for (let z = 0; z < this.size; z++) {
+                // Only place roads on empty tiles
+                if (this.grid[x][z] === null) {
+                    let neighborCount = 0;
+
+                    neighbors.forEach(([dx, dz]) => {
+                        const nx = x + dx;
+                        const nz = z + dz;
+                        if (this.isValid(nx, nz) && this.grid[nx][nz] !== null) {
+                            neighborCount++;
+                        }
+                    });
+
+                    // If it has at least 2 neighbors (building or road), it becomes a road
+                    // This prevents flood-filling the entire map
+                    if (neighborCount >= 2) {
+                        this.place(x, z, -1); // Tier -1 is Road
+                        spawnVisual(x, z, -1);
+                    }
+                }
+            }
         }
     }
 
@@ -320,7 +432,8 @@ class CityGrid {
         let empties = [];
         for (let x = 0; x < this.size; x++) {
             for (let z = 0; z < this.size; z++) {
-                if (!this.grid[x][z]) empties.push({ x, z });
+                // Empties or Roads are valid spawn points for buildings
+                if (!this.grid[x][z] || this.grid[x][z].tier === -1) empties.push({ x, z });
             }
         }
         return empties;
@@ -354,9 +467,9 @@ class CityGrid {
 
     floodFill(x, z, tier, visited) {
         let cluster = [];
-        let stack = [{x, z}];
+        let stack = [{ x, z }];
 
-        while(stack.length > 0) {
+        while (stack.length > 0) {
             let p = stack.pop();
             let key = `${p.x},${p.z}`;
 
@@ -372,10 +485,10 @@ class CityGrid {
                 cell.z = p.z;
 
                 // Check Neighbors
-                stack.push({x: p.x + 1, z: p.z});
-                stack.push({x: p.x - 1, z: p.z});
-                stack.push({x: p.x, z: p.z + 1});
-                stack.push({x: p.x, z: p.z - 1});
+                stack.push({ x: p.x + 1, z: p.z });
+                stack.push({ x: p.x - 1, z: p.z });
+                stack.push({ x: p.x, z: p.z + 1 });
+                stack.push({ x: p.x, z: p.z - 1 });
             }
         }
         return cluster;
@@ -456,48 +569,52 @@ function spawnVisual(x, z, tier) {
     // POP Animation
     gsap.to(mesh.scale, {
         x: 1, y: 1, z: 1,
-        duration: 0.6,
+        duration: 0.2,
         ease: "elastic.out(1, 0.5)"
     });
 }
 
 // THE HEARTBEAT
-// function gameTick() {
-//     // 1. Check for Merges
-//     const cluster = city.findMergeCluster();
+function gameTick() {
+    if (gameState.isBusy || gameState.isGameOver) return;
 
-//     if (cluster) {
-//         // Merge Logic
-//         const survivor = cluster[0]; // Logic: First one stays
-//         const newTier = survivor.tier + 1;
+    // 1. Check for Merges
+    const cluster = city.findMergeCluster();
+    if (cluster) {
+        resolveMerges(cluster[0].x, cluster[0].z);
+    } else {
+        // 2. Spawn Logic
+        const empties = city.getEmpties();
+        if (empties.length === 0) {
+            console.log("Grid Full! Game Over.");
+            triggerGameOver();
+            return;
+        }
 
-//         // Remove all from data & visual
-//         cluster.forEach(b => city.remove(b.x, b.z));
+        // Clustering Logic: Filter for empties with neighbors
+        const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+        const candidates = empties.filter(pos => {
+            return neighbors.some(([dx, dz]) => {
+                const nx = pos.x + dx;
+                const nz = pos.z + dz;
+                return city.isValid(nx, nz) && city.grid[nx][nz] !== null;
+            });
+        });
 
-//         // Delay spawn of upgrade to let shrink animation play
-//         setTimeout(() => {
-//             city.place(survivor.x, survivor.z, newTier);
-//             spawnVisual(survivor.x, survivor.z, newTier);
-//         }, 300);
+        // Pick from candidates if any, otherwise random (first building)
+        const targets = candidates.length > 0 ? candidates : empties;
+        const spot = targets[Math.floor(Math.random() * targets.length)];
 
-//     } else {
-//         // 2. Spawn Logic
-//         const empties = city.getEmpties();
-//         if (empties.length === 0) {
-//             // Game Over / Reset
-//             console.log("Grid Full! Resetting...");
-//             // Optional: city = new CityGrid(5); // Reset logic
-//             return;
-//         }
+        city.place(spot.x, spot.z, 1); // Always spawn Tier 1
+        spawnVisual(spot.x, spot.z, 1);
 
-//         const spot = empties[Math.floor(Math.random() * empties.length)];
-//         city.place(spot.x, spot.z, 1); // Always spawn Tier 1
-//         spawnVisual(spot.x, spot.z, 1);
-//     }
-// }
+        // Immediate merge check for the new placement
+        resolveMerges(spot.x, spot.z);
+    }
+}
 
 // Start Timer
-// setInterval(gameTick, CONFIG.tickRate);
+setInterval(gameTick, CONFIG.tickRate);
 
 // --- 6. INTERACTION ---
 
@@ -560,7 +677,7 @@ window.addEventListener('mousedown', (event) => {
         const gx = Math.round((point.x + offset) / CONFIG.tileSize);
         const gz = Math.round((point.z + offset) / CONFIG.tileSize);
 
-        if (city.isValid(gx, gz) && city.grid[gx][gz] === null) {
+        if (city.isValid(gx, gz) && (city.grid[gx][gz] === null || city.grid[gx][gz].tier === -1)) {
             // Place Building
             city.place(gx, gz, gameState.nextTier);
             spawnVisual(gx, gz, gameState.nextTier);
@@ -584,6 +701,10 @@ function resolveMerges(x, z) {
     }
 
     const currentTier = city.grid[x][z].tier;
+    if (currentTier === -1) { // Don't merge roads
+        gameState.isBusy = false;
+        return;
+    }
     const cluster = city.floodFill(x, z, currentTier, new Set());
 
     if (cluster.length >= 3) {
@@ -601,11 +722,236 @@ function resolveMerges(x, z) {
 
             // Recursive check
             resolveMerges(x, z);
-        }, 400);
+        }, 150);
     } else {
         gameState.isBusy = false;
     }
 }
+
+// --- 5.1 AVATAR SYSTEM ---
+
+class Avatar {
+    constructor(startGridX, startGridZ) {
+        this.gx = startGridX;
+        this.gz = startGridZ;
+
+        // Visuals
+        const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+        const bodyGeo = new THREE.ConeGeometry(0.1, 0.3, 8);
+        const mat = new THREE.MeshStandardMaterial({ color: color });
+        this.mesh = new THREE.Mesh(bodyGeo, mat);
+
+        const startPos = gridToWorld(this.gx, this.gz);
+        this.mesh.position.set(startPos.x, 0.15, startPos.z);
+        this.mesh.castShadow = true;
+        scene.add(this.mesh);
+
+        // Movement State
+        this.isMoving = false;
+        this.target = null;
+        this.speed = 2.0; // Units per second
+    }
+
+    update(dt) {
+        if (this.isMoving && this.target) {
+            const currentPos = this.mesh.position;
+            const targetPos = this.target;
+
+            const dist = currentPos.distanceTo(targetPos);
+
+            if (dist < 0.05) {
+                // Arrived
+                this.mesh.position.copy(targetPos);
+                this.isMoving = false;
+                this.gx = this.targetGx;
+                this.gz = this.targetGz;
+                // Decide next move immediately or wait? 
+                // Let's decide next frame implicitly by being not moving
+            } else {
+                // Move towards
+                const dir = new THREE.Vector3().subVectors(targetPos, currentPos).normalize();
+                this.mesh.position.add(dir.multiplyScalar(this.speed * dt));
+            }
+        } else {
+            // Pick a new target
+            this.pickMove();
+        }
+    }
+
+    pickMove() {
+        // Look for valid neighbors (Roads or Buildings)
+        const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+        const validMoves = [];
+
+        neighbors.forEach(([dx, dz]) => {
+            const nx = this.gx + dx;
+            const nz = this.gz + dz;
+
+            if (city.isValid(nx, nz)) {
+                // Walkable if it's a Road (-1) or a Building (Tier >= 1)
+                // Actually, let's say they can walk on everything except empty void?
+                // Or maybe strictly Roads and Buildings?
+                const cell = city.grid[nx][nz];
+                if (cell !== null) {
+                    validMoves.push({ x: nx, z: nz });
+                }
+            }
+        });
+
+        if (validMoves.length > 0) {
+            // Pick random
+            const limit = 10; // Tries to pick a move that isn't previous one logic could go here
+            const next = validMoves[Math.floor(Math.random() * validMoves.length)];
+
+            this.targetGx = next.x;
+            this.targetGz = next.z;
+            const worldPos = gridToWorld(next.x, next.z);
+            this.target = new THREE.Vector3(worldPos.x, 0.15, worldPos.z);
+            this.isMoving = true;
+
+            // Face direction
+            this.mesh.lookAt(this.target);
+            // Rotate X to stand up (Cone geometry is weird, points up Y)
+            // Actually lookAt points Z axis. Cone points up Y. 
+            // We need to rotate geometry or mesh to align. 
+            // Simple approach: Just bob up and down
+        }
+    }
+
+    dispose() {
+        scene.remove(this.mesh);
+    }
+}
+
+class AvatarManager {
+    constructor() {
+        this.avatars = [];
+        this.maxAvatars = 20;
+        this.spawnTimer = 0;
+    }
+
+    update(dt) {
+        // Update all avatars
+        this.avatars.forEach(a => a.update(dt));
+
+        // Spawn new ones occasionally
+        this.spawnTimer += dt;
+        if (this.spawnTimer > 2.0 && this.avatars.length < this.maxAvatars) {
+            this.spawnTimer = 0;
+            this.trySpawn();
+        }
+    }
+
+    trySpawn() {
+        // Find a random building to spawn from
+        const buildings = [];
+        for (let x = 0; x < city.size; x++) {
+            for (let z = 0; z < city.size; z++) {
+                if (city.grid[x][z] && city.grid[x][z].tier > 0) {
+                    buildings.push({ x, z });
+                }
+            }
+        }
+
+        if (buildings.length > 0) {
+            const spot = buildings[Math.floor(Math.random() * buildings.length)];
+            this.avatars.push(new Avatar(spot.x, spot.z));
+        }
+    }
+}
+
+const avatarManager = new AvatarManager();
+
+// --- GAME OVER LOGIC ---
+
+function triggerGameOver() {
+    if (gameState.isGameOver) return;
+    gameState.isGameOver = true;
+    gameState.isBusy = true;
+
+    console.log("TRIGGERING GAME OVER EXPLOSION!");
+
+    // Gather all meshes
+    const allMeshes = [];
+    for (let x = 0; x < CONFIG.gridSize; x++) {
+        for (let z = 0; z < CONFIG.gridSize; z++) {
+            if (city.meshGrid[x][z]) {
+                allMeshes.push(city.meshGrid[x][z]);
+            }
+        }
+    }
+
+    if (allMeshes.length === 0) {
+        resetGame();
+        return;
+    }
+
+    // Explosion Animation
+    allMeshes.forEach((mesh, chatIndex) => {
+        // Random direction up and out
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 5 + Math.random() * 10;
+        const tx = mesh.position.x + Math.cos(angle) * dist;
+        const tz = mesh.position.z + Math.sin(angle) * dist;
+        const ty = 10 + Math.random() * 10;
+
+        gsap.to(mesh.position, {
+            x: tx,
+            y: ty,
+            z: tz,
+            duration: 1.5,
+            ease: "power2.out"
+        });
+
+        gsap.to(mesh.rotation, {
+            x: Math.random() * 10,
+            y: Math.random() * 10,
+            z: Math.random() * 10,
+            duration: 1.5,
+            ease: "linear"
+        });
+
+        gsap.to(mesh.scale, {
+            x: 0,
+            y: 0,
+            z: 0,
+            duration: 0.5,
+            delay: 1,
+            ease: "back.in(1.7)"
+        });
+    });
+
+    // Reset after animation
+    setTimeout(resetGame, 1600);
+}
+
+function resetGame() {
+    // 1. Clear Scene Meshes
+    for (let x = 0; x < CONFIG.gridSize; x++) {
+        for (let z = 0; z < CONFIG.gridSize; z++) {
+            if (city.meshGrid[x][z]) {
+                scene.remove(city.meshGrid[x][z]);
+                city.meshGrid[x][z] = null;
+            }
+        }
+    }
+
+    // 2. Clear Data
+    city.grid = Array(CONFIG.gridSize).fill().map(() => Array(CONFIG.gridSize).fill(null));
+    city.meshGrid = Array(CONFIG.gridSize).fill().map(() => Array(CONFIG.gridSize).fill(null));
+
+    // 3. Reset State
+    city.score = 0;
+    city.updateUI();
+
+    gameState.isGameOver = false;
+    gameState.isBusy = false;
+    gameState.nextTier = 1; // Reset next tier
+    updateNextTierUI();
+
+    console.log("Game Reset Complete");
+}
+
 
 function updateNextTierUI() {
     const nextTierEl = document.getElementById('next-tier');
@@ -620,8 +966,14 @@ function updateNextTierUI() {
 }
 
 // Render Loop
+const clock = new THREE.Clock();
+
 function animate() {
     requestAnimationFrame(animate);
+
+    const dt = clock.getDelta();
+    avatarManager.update(dt);
+
     renderer.render(scene, camera);
 }
 animate();
