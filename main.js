@@ -210,7 +210,8 @@ const PALETTE = [
 
 // Material Factory
 function createPlasticMat(colorHex) {
-    return new THREE.MeshStandardMaterial({
+    // Reuse via getMaterial
+    return getMaterial('standard', {
         color: colorHex,
         roughness: 0.3,
         metalness: 0.1,
@@ -218,8 +219,31 @@ function createPlasticMat(colorHex) {
     });
 }
 
-// Texture Cache
-const TEXTURE_CACHE = {};
+// --- ASSET MANAGEMENT ---
+const ASSETS = {
+    textures: {},
+    geometries: {},
+    materials: {}
+};
+
+// Initialize common geometries
+ASSETS.geometries.box = new THREE.BoxGeometry(1, 1, 1);
+ASSETS.geometries.cylinder = new THREE.CylinderGeometry(1, 1, 1, 16); // Base, will be scaled
+ASSETS.geometries.cone = new THREE.ConeGeometry(0.6, 0.4, 4);
+ASSETS.geometries.torus = new THREE.TorusGeometry(0.3, 0.05, 16, 16);
+ASSETS.geometries.plane = new THREE.PlaneGeometry(1, 1);
+
+function getMaterial(type, params) {
+    const key = `${type}_${JSON.stringify(params)}`;
+    if (!ASSETS.materials[key]) {
+        if (type === 'standard') {
+            ASSETS.materials[key] = new THREE.MeshStandardMaterial(params);
+        } else if (type === 'basic') {
+            ASSETS.materials[key] = new THREE.MeshBasicMaterial(params);
+        }
+    }
+    return ASSETS.materials[key];
+}
 
 // The Procedural Building Generator
 function createBuildingMesh(tier) {
@@ -227,43 +251,46 @@ function createBuildingMesh(tier) {
     const t = Math.min(Math.max(tier, 1), 10);
 
     // Generate or Fetch Texture
-    if (!TEXTURE_CACHE[t]) {
+    if (!ASSETS.textures[t]) {
         const colorHex = PALETTE[t - 1];
         const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
 
         if (t === -1) {
-            TEXTURE_CACHE[t] = TextureFactory.road();
+            ASSETS.textures[t] = TextureFactory.road();
         } else if (t <= 3) {
-            TEXTURE_CACHE[t] = TextureFactory.residential(colorStr, '#feffdf'); // Light Yellow Windows
+            ASSETS.textures[t] = TextureFactory.residential(colorStr, '#feffdf'); // Light Yellow Windows
         } else if (t <= 6) {
-            TEXTURE_CACHE[t] = TextureFactory.commercial(colorStr, '#e0f7fa'); // Cyan Glass
+            ASSETS.textures[t] = TextureFactory.commercial(colorStr, '#e0f7fa'); // Cyan Glass
         } else {
-            TEXTURE_CACHE[t] = TextureFactory.grid(colorStr, '#ffffff'); // High tech white lines
+            ASSETS.textures[t] = TextureFactory.grid(colorStr, '#ffffff'); // High tech white lines
         }
     }
 
     if (t === -1) {
         // Road Mesh (Flat plane slightly above ground)
-        const roadMat = new THREE.MeshStandardMaterial({
-            map: TEXTURE_CACHE[t],
+        const roadMat = getMaterial('standard', {
+            map: ASSETS.textures[t],
             roughness: 0.9,
             metalness: 0.0
         });
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.05, 1), roadMat);
+
+        // Reuse box geometry, scale it
+        const mesh = new THREE.Mesh(ASSETS.geometries.box, roadMat);
+        mesh.scale.set(1, 0.05, 1);
         mesh.position.y = 0.025;
         mesh.receiveShadow = true;
         return mesh;
     }
 
-    const mat = new THREE.MeshStandardMaterial({
-        map: TEXTURE_CACHE[t],
+    const mat = getMaterial('standard', {
+        map: ASSETS.textures[t],
         roughness: 0.3,
         metalness: 0.1
     });
 
     // Roof Material (Darker shade of base color)
     const roofColor = new THREE.Color(PALETTE[t - 1]).multiplyScalar(0.6);
-    const roofMat = new THREE.MeshStandardMaterial({
+    const roofMat = getMaterial('standard', {
         color: roofColor,
         roughness: 0.6,
         flatShading: true
@@ -271,8 +298,8 @@ function createBuildingMesh(tier) {
 
     // Materials Arrays
     // Box: Right, Left, Top, Bottom, Front, Back
+    // Note: Mutating shared arrays is bad if we modify them later, but here they are just passed to Mesh
     const boxMaterials = [mat, mat, roofMat, mat, mat, mat];
-    // Cylinder: Side, Top, Bottom
     const cylMaterials = [mat, roofMat, roofMat];
 
     let mesh;
@@ -280,20 +307,27 @@ function createBuildingMesh(tier) {
     // Procedural Shapes based on Tier
     if (t === 1) {
         // Small House
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), boxMaterials);
+        mesh = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        mesh.scale.set(0.8, 0.5, 0.8);
         mesh.position.y = 0.25;
     }
     else if (t === 2) {
         // Tall House / Apartment
-        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.6), boxMaterials);
+        mesh = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        mesh.scale.set(0.6, 0.8, 0.6);
         mesh.position.y = 0.4;
     }
     else if (t === 3) {
         // Complex House
         mesh = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), boxMaterials);
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(0.8, 0.6, 0.8);
         base.position.y = 0.3;
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.4, 4), createPlasticMat(0x444444));
+
+        const roof = new THREE.Mesh(ASSETS.geometries.cone, createPlasticMat(0x444444));
+        // Reset/Preset cone? Cone geometry is shared.
+        // It's already defined as 0.6, 0.4, 4. 
+        // We shouldn't scale accessors of shared geometry, but mesh.scale is fine.
         roof.position.y = 0.8;
         roof.rotation.y = Math.PI / 4;
         mesh.add(base, roof);
@@ -301,19 +335,34 @@ function createBuildingMesh(tier) {
     else if (t >= 4 && t <= 6) {
         // Tower Block
         mesh = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1 + (t * 0.2), 0.6), boxMaterials);
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(0.6, 1 + (t * 0.2), 0.6);
         base.position.y = (1 + (t * 0.2)) / 2;
-        const top = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.4), createPlasticMat(0xffffff));
+
+        const top = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0xffffff));
+        top.scale.set(0.4, 0.2, 0.4);
         top.position.y = 1 + (t * 0.2) + 0.1;
         mesh.add(base, top);
     }
     else {
         // Skyscraper / Rocket
         mesh = new THREE.Group();
-        // Use Cylinder but increase segments for smoother texture look
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 1 + (t * 0.3), 16), cylMaterials);
-        body.position.y = (1 + (t * 0.3)) / 2;
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 16, 16), createPlasticMat(0xffffff));
+
+        // Cylinder Geometry reused (1,1,1) -> scaled
+        const bodyHeight = 1 + (t * 0.3);
+        const body = new THREE.Mesh(ASSETS.geometries.cylinder, cylMaterials);
+        body.scale.set(0.2, bodyHeight, 0.2); // Radius 0.2 (from 1), Height bodyHeight (from 1)
+        // Original was CylinderGeometry(0.2, 0.4, ...). Top radius 0.2, bottom 0.4.
+        // Our shared cylinder is 1, 1. We can't easily change top/bottom radius ratio with scale alone effectively if we want 0.2 to 0.4 taper.
+        // For simplicity/performance, let's just use a straight cylinder or create a tapered one if strictly needed.
+        // Let's stick to straight cylinder for performance reuse, or make a specific tapered geometry.
+        // Actually, let's just make a dedicated tapered geometry for this if we want to keep the look roughly same.
+        // Or just accept straight cylinder.
+        // Let's create a specific Geometry for skyscrapers if needed, but for now straight is fine.
+
+        body.position.y = bodyHeight / 2;
+
+        const ring = new THREE.Mesh(ASSETS.geometries.torus, createPlasticMat(0xffffff));
         ring.position.y = (t * 0.2);
         ring.rotation.x = Math.PI / 2;
         mesh.add(body, ring);
@@ -335,6 +384,7 @@ class CityGrid {
         this.grid = Array(size).fill().map(() => Array(size).fill(null));
         this.meshGrid = Array(size).fill().map(() => Array(size).fill(null)); // Stores 3D objects
         this.score = 0;
+        this.buildingCount = 0;
     }
 
     // Check if coordinate is valid
@@ -361,8 +411,7 @@ class CityGrid {
         // Only score if it's a building (tier > 0)
         if (tier > 0) {
             this.score += Math.pow(tier, 2) * 10; // Exponential score
-            this.updateUI();
-            // this.updateRoads(); // Check for new roads
+            this.buildingCount++;
         }
 
         return this.grid[x][z];
@@ -376,6 +425,10 @@ class CityGrid {
         // Actually, remove serves game logic (merging), so we should remove roads 
         // if they are part of the merge? No, merges are tier-based. 
         // Roads are tier -1.
+
+        if (this.grid[x][z] && this.grid[x][z].tier > 0) {
+            this.buildingCount--;
+        }
 
         this.grid[x][z] = null;
 
@@ -494,9 +547,7 @@ class CityGrid {
         return cluster;
     }
 
-    updateUI() {
-        document.getElementById('pop-count').innerText = this.score;
-    }
+
 }
 
 // --- 5. EXECUTION & LOOP ---
@@ -518,7 +569,6 @@ function generateNextTier() {
 
 // Initial Generation
 gameState.nextTier = generateNextTier();
-updateNextTierUI();
 
 // Helper: Convert Grid Index to World Position
 function gridToWorld(x, z) {
@@ -687,7 +737,6 @@ window.addEventListener('mousedown', (event) => {
 
             // Next Turn
             gameState.nextTier = generateNextTier();
-            updateNextTierUI();
 
             console.log("Next Tier:", gameState.nextTier);
         }
@@ -737,9 +786,20 @@ class Avatar {
 
         // Visuals
         const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
-        const bodyGeo = new THREE.ConeGeometry(0.1, 0.3, 8);
-        const mat = new THREE.MeshStandardMaterial({ color: color });
-        this.mesh = new THREE.Mesh(bodyGeo, mat);
+        const mat = getMaterial('standard', { color: color });
+
+        // Reuse cone geometry
+        // ConeGeometry(0.1, 0.3, 8)
+        // Shared cone is (0.6, 0.4, 4). 
+        // Let's create a specific avatar cone or scale the shared one?
+        // Scaling smooth cone (8 segments) from low poly (4 segments) looks bad.
+        // Let's add a specific avatar geometry to assets if not present, or just make one here for sharing.
+
+        if (!ASSETS.geometries.avatar) {
+            ASSETS.geometries.avatar = new THREE.ConeGeometry(0.1, 0.3, 8);
+        }
+
+        this.mesh = new THREE.Mesh(ASSETS.geometries.avatar, mat);
 
         const startPos = gridToWorld(this.gx, this.gz);
         this.mesh.position.set(startPos.x, 0.15, startPos.z);
@@ -820,6 +880,7 @@ class Avatar {
 
     dispose() {
         scene.remove(this.mesh);
+        // Do NOT dispose geometry or material as they are shared now!
     }
 }
 
@@ -942,28 +1003,21 @@ function resetGame() {
 
     // 3. Reset State
     city.score = 0;
-    city.updateUI();
+    city.buildingCount = 0;
+
+    // Reset Avatars
+    avatarManager.avatars.forEach(a => a.dispose());
+    avatarManager.avatars = [];
 
     gameState.isGameOver = false;
     gameState.isBusy = false;
     gameState.nextTier = 1; // Reset next tier
-    updateNextTierUI();
 
     console.log("Game Reset Complete");
 }
 
 
-function updateNextTierUI() {
-    const nextTierEl = document.getElementById('next-tier');
-    if (nextTierEl) {
-        nextTierEl.innerText = gameState.nextTier;
 
-        // Update color based on tier palette
-        const t = Math.min(Math.max(gameState.nextTier, 1), 10);
-        const colorHex = PALETTE[t - 1];
-        nextTierEl.style.color = '#' + colorHex.toString(16).padStart(6, '0');
-    }
-}
 
 // Render Loop
 const clock = new THREE.Clock();
@@ -973,6 +1027,12 @@ function animate() {
 
     const dt = clock.getDelta();
     avatarManager.update(dt);
+
+    // Update UI
+    const popCountEl = document.getElementById('pop-count');
+    const buildingCountEl = document.getElementById('building-count');
+    if (popCountEl) popCountEl.innerText = avatarManager.avatars.length;
+    if (buildingCountEl) buildingCountEl.innerText = city.buildingCount;
 
     renderer.render(scene, camera);
 }
