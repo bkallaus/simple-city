@@ -257,6 +257,8 @@ function createBuildingMesh(tier) {
 
         if (t === -1) {
             ASSETS.textures[t] = TextureFactory.road();
+        } else if (t === -2) {
+             // Nature / Obstacle (No texture needed, using materials)
         } else if (t <= 3) {
             ASSETS.textures[t] = TextureFactory.residential(colorStr, '#feffdf'); // Light Yellow Windows
         } else if (t <= 6) {
@@ -280,6 +282,38 @@ function createBuildingMesh(tier) {
         mesh.position.y = 0.025;
         mesh.receiveShadow = true;
         return mesh;
+    }
+
+    if (t === -2) {
+        // Nature Obstacle (Tree)
+        const group = new THREE.Group();
+
+        // Tree Geometry & Material (Recreated here for grid placement)
+        // Ideally we'd cache these geometries in ASSETS but for now it's okay
+        const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.4, 6);
+        const leavesGeo = new THREE.ConeGeometry(0.5, 1.2, 8);
+
+        const trunkMat = getMaterial('standard', { color: 0x5d4037, roughness: 0.9, flatShading: true });
+        const leavesMat = getMaterial('standard', { color: 0x2d6a4f, roughness: 0.8, flatShading: true });
+
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 0.2;
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+
+        const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+        leaves.position.y = 0.8;
+        leaves.castShadow = true;
+        leaves.receiveShadow = true;
+
+        group.add(trunk, leaves);
+
+        // Random slight rotation/scale for variety
+        group.rotation.y = Math.random() * Math.PI * 2;
+        const s = 0.8 + Math.random() * 0.4;
+        group.scale.set(s, s, s);
+
+        return group;
     }
 
     const mat = getMaterial('standard', {
@@ -454,12 +488,13 @@ class CloudSystem {
         this.bounds = 30; // Spawn/Despawn distance
 
         // Shared geometry/material
-        this.geo = new THREE.BoxGeometry(1, 1, 1);
+        // Use Icosahedron for low-poly but "smoother" look compared to Box
+        this.geo = new THREE.IcosahedronGeometry(1, 0);
         this.mat = new THREE.MeshStandardMaterial({
             color: 0xffffff,
-            roughness: 0.9,
+            roughness: 0.4,
             flatShading: true,
-            opacity: 0.9,
+            opacity: 0.85,
             transparent: true
         });
 
@@ -471,16 +506,21 @@ class CloudSystem {
     spawn(randomX = false) {
         const cloud = new THREE.Group();
 
-        // Build cloud shape
-        const segments = 3 + Math.floor(Math.random() * 3);
+        // Build cloud shape - More segments for fluffiness
+        const segments = 5 + Math.floor(Math.random() * 4);
         for(let i=0; i<segments; i++) {
             const mesh = new THREE.Mesh(this.geo, this.mat);
             mesh.position.set(
-                (Math.random() - 0.5) * 1.5,
-                (Math.random() - 0.5) * 0.5,
-                (Math.random() - 0.5) * 1.0
+                (Math.random() - 0.5) * 2.0,
+                (Math.random() - 0.5) * 0.8,
+                (Math.random() - 0.5) * 1.5
             );
-            mesh.scale.setScalar(0.8 + Math.random() * 0.5);
+            const scale = 0.5 + Math.random() * 0.6;
+            mesh.scale.setScalar(scale);
+
+            // Random rotation for variety
+            mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+
             // Clouds cast soft shadows
             mesh.castShadow = true;
             cloud.add(mesh);
@@ -544,6 +584,7 @@ class CityGrid {
         if (!this.isValid(x, z)) return null;
 
         // If it's a road, we can overwrite it. If it's a building, we can't.
+        // Tier -2 (Obstacle) also cannot be overwritten
         if (this.grid[x][z] !== null && this.grid[x][z].tier !== -1) return null;
 
         // Remove visualization if overwriting road
@@ -568,10 +609,8 @@ class CityGrid {
     remove(x, z) {
         if (!this.isValid(x, z)) return;
 
-        // Don't remove roads unless forced (tier -1)
-        // Actually, remove serves game logic (merging), so we should remove roads 
-        // if they are part of the merge? No, merges are tier-based. 
-        // Roads are tier -1.
+        // Don't remove roads unless forced (tier -1) or obstacles (tier -2)
+        // Only buildings (tier > 0) contribute to count
 
         if (this.grid[x][z] && this.grid[x][z].tier > 0) {
             this.buildingCount--;
@@ -702,6 +741,29 @@ class CityGrid {
 // Init Game State
 const city = new CityGrid(CONFIG.gridSize);
 
+// Initial Obstacles
+function spawnObstacles() {
+    const obstacleCount = 8; // Adjust for difficulty
+    for (let i = 0; i < obstacleCount; i++) {
+        let placed = false;
+        let attempts = 0;
+        while (!placed && attempts < 20) {
+            const x = Math.floor(Math.random() * CONFIG.gridSize);
+            const z = Math.floor(Math.random() * CONFIG.gridSize);
+
+            // Ensure empty spot
+            if (city.grid[x][z] === null) {
+                // Manually set data to Tier -2
+                city.grid[x][z] = { tier: -2, id: 'obstacle' };
+                spawnVisual(x, z, -2);
+                placed = true;
+            }
+            attempts++;
+        }
+    }
+}
+spawnObstacles();
+
 // New Game State Logic
 const gameState = {
     nextTier: 1,
@@ -764,9 +826,10 @@ function generateEnvironment() {
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6, flatShading: true });
 
     // Place randomly in a ring
-    const count = 30;
-    const minR = (CONFIG.gridSize * CONFIG.tileSize) / 2 + 3; // Start outside grid
-    const maxR = minR + 15;
+    // Reduced count to avoid clutter now that we have trees on board
+    const count = 20;
+    const minR = (CONFIG.gridSize * CONFIG.tileSize) / 2 + 4; // Pushed further out
+    const maxR = minR + 12;
 
     for(let i=0; i<count; i++) {
         const angle = Math.random() * Math.PI * 2;
@@ -959,6 +1022,7 @@ window.addEventListener('mousedown', (event) => {
         const gx = Math.round((point.x + offset) / CONFIG.tileSize);
         const gz = Math.round((point.z + offset) / CONFIG.tileSize);
 
+        // Can build on Empty (null) or Road (-1). CANNOT build on Obstacle (-2) or Building (>0)
         if (city.isValid(gx, gz) && (city.grid[gx][gz] === null || city.grid[gx][gz].tier === -1)) {
             // Place Building
             city.place(gx, gz, gameState.nextTier);
