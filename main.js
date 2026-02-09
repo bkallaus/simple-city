@@ -257,6 +257,8 @@ function createBuildingMesh(tier) {
 
         if (t === -1) {
             ASSETS.textures[t] = TextureFactory.road();
+        } else if (t === -2) {
+             // Nature / Obstacle (No texture needed, using materials)
         } else if (t <= 3) {
             ASSETS.textures[t] = TextureFactory.residential(colorStr, '#feffdf'); // Light Yellow Windows
         } else if (t <= 6) {
@@ -280,6 +282,38 @@ function createBuildingMesh(tier) {
         mesh.position.y = 0.025;
         mesh.receiveShadow = true;
         return mesh;
+    }
+
+    if (t === -2) {
+        // Nature Obstacle (Tree)
+        const group = new THREE.Group();
+
+        // Tree Geometry & Material (Recreated here for grid placement)
+        // Ideally we'd cache these geometries in ASSETS but for now it's okay
+        const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.4, 6);
+        const leavesGeo = new THREE.ConeGeometry(0.5, 1.2, 8);
+
+        const trunkMat = getMaterial('standard', { color: 0x5d4037, roughness: 0.9, flatShading: true });
+        const leavesMat = getMaterial('standard', { color: 0x2d6a4f, roughness: 0.8, flatShading: true });
+
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 0.2;
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+
+        const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+        leaves.position.y = 0.8;
+        leaves.castShadow = true;
+        leaves.receiveShadow = true;
+
+        group.add(trunk, leaves);
+
+        // Random slight rotation/scale for variety
+        group.rotation.y = Math.random() * Math.PI * 2;
+        const s = 0.8 + Math.random() * 0.4;
+        group.scale.set(s, s, s);
+
+        return group;
     }
 
     const mat = getMaterial('standard', {
@@ -376,6 +410,159 @@ function createBuildingMesh(tier) {
     return mesh;
 }
 
+// --- 3.1 PARTICLE SYSTEM ---
+
+const particleGeometry = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+
+class ParticleSystem {
+    constructor() {
+        this.particles = [];
+    }
+
+    spawn(x, z, colorHex, count = 16) {
+        // We rely on gridToWorld being hoisted
+        const pos = gridToWorld(x, z);
+
+        for (let i = 0; i < count; i++) {
+            const material = getMaterial('basic', { color: colorHex });
+
+            const mesh = new THREE.Mesh(particleGeometry, material);
+            mesh.position.set(pos.x, 0.5, pos.z);
+
+            // Explosion Physics
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 1.5 + 0.5;
+            const height = Math.random() * 3 + 2;
+
+            this.particles.push({
+                mesh: mesh,
+                vx: Math.cos(angle) * speed,
+                vy: height,
+                vz: Math.sin(angle) * speed,
+                life: 1.0 + Math.random() * 0.5,
+                gravity: 15
+            });
+
+            // Random rotation
+            mesh.rotation.set(Math.random(), Math.random(), Math.random());
+
+            scene.add(mesh);
+        }
+    }
+
+    update(dt) {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.life -= dt;
+
+            if (p.life <= 0) {
+                scene.remove(p.mesh);
+                this.particles.splice(i, 1);
+                continue;
+            }
+
+            p.vy -= p.gravity * dt;
+            p.mesh.position.x += p.vx * dt;
+            p.mesh.position.y += p.vy * dt;
+            p.mesh.position.z += p.vz * dt;
+
+            p.mesh.rotation.x += p.vx * dt * 2;
+            p.mesh.rotation.z += p.vz * dt * 2;
+
+            // Scale out
+            if (p.life < 0.3) {
+                 const s = p.life / 0.3;
+                 p.mesh.scale.setScalar(s);
+            }
+        }
+    }
+}
+
+const particleSystem = new ParticleSystem();
+
+// --- 3.2 CLOUD SYSTEM ---
+
+class CloudSystem {
+    constructor(count = 8) {
+        this.clouds = [];
+        this.bounds = 30; // Spawn/Despawn distance
+
+        // Shared geometry/material
+        // Use Icosahedron for low-poly but "smoother" look compared to Box
+        this.geo = new THREE.IcosahedronGeometry(1, 0);
+        this.mat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.4,
+            flatShading: true,
+            opacity: 0.85,
+            transparent: true
+        });
+
+        for(let i=0; i<count; i++) {
+            this.spawn(true); // Initial spawn random placement
+        }
+    }
+
+    spawn(randomX = false) {
+        const cloud = new THREE.Group();
+
+        // Build cloud shape - More segments for fluffiness
+        const segments = 5 + Math.floor(Math.random() * 4);
+        for(let i=0; i<segments; i++) {
+            const mesh = new THREE.Mesh(this.geo, this.mat);
+            mesh.position.set(
+                (Math.random() - 0.5) * 2.0,
+                (Math.random() - 0.5) * 0.8,
+                (Math.random() - 0.5) * 1.5
+            );
+            const scale = 0.5 + Math.random() * 0.6;
+            mesh.scale.setScalar(scale);
+
+            // Random rotation for variety
+            mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+
+            // Clouds cast soft shadows
+            mesh.castShadow = true;
+            cloud.add(mesh);
+        }
+
+        // Position
+        const z = (Math.random() - 0.5) * 40; // Spread wide
+        const y = 8 + Math.random() * 5;     // High up
+        let x = -this.bounds;
+
+        if (randomX) {
+            x = (Math.random() - 0.5) * this.bounds * 2;
+        }
+
+        cloud.position.set(x, y, z);
+
+        // Metadata for movement
+        cloud.userData = {
+            speed: 1.0 + Math.random() * 1.0
+        };
+
+        scene.add(cloud);
+        this.clouds.push(cloud);
+    }
+
+    update(dt) {
+        this.clouds.forEach(cloud => {
+            cloud.position.x += cloud.userData.speed * dt;
+
+            // Wrap around
+            if (cloud.position.x > this.bounds) {
+                cloud.position.x = -this.bounds;
+                cloud.position.z = (Math.random() - 0.5) * 40;
+                cloud.position.y = 8 + Math.random() * 5;
+                cloud.userData.speed = 1.0 + Math.random() * 1.0;
+            }
+        });
+    }
+}
+
+const cloudSystem = new CloudSystem();
+
 // --- 4. GAME LOGIC (THE BRAIN) ---
 
 class CityGrid {
@@ -397,6 +584,7 @@ class CityGrid {
         if (!this.isValid(x, z)) return null;
 
         // If it's a road, we can overwrite it. If it's a building, we can't.
+        // Tier -2 (Obstacle) also cannot be overwritten
         if (this.grid[x][z] !== null && this.grid[x][z].tier !== -1) return null;
 
         // Remove visualization if overwriting road
@@ -421,10 +609,8 @@ class CityGrid {
     remove(x, z) {
         if (!this.isValid(x, z)) return;
 
-        // Don't remove roads unless forced (tier -1)
-        // Actually, remove serves game logic (merging), so we should remove roads 
-        // if they are part of the merge? No, merges are tier-based. 
-        // Roads are tier -1.
+        // Don't remove roads unless forced (tier -1) or obstacles (tier -2)
+        // Only buildings (tier > 0) contribute to count
 
         if (this.grid[x][z] && this.grid[x][z].tier > 0) {
             this.buildingCount--;
@@ -555,6 +741,29 @@ class CityGrid {
 // Init Game State
 const city = new CityGrid(CONFIG.gridSize);
 
+// Initial Obstacles
+function spawnObstacles() {
+    const obstacleCount = 8; // Adjust for difficulty
+    for (let i = 0; i < obstacleCount; i++) {
+        let placed = false;
+        let attempts = 0;
+        while (!placed && attempts < 20) {
+            const x = Math.floor(Math.random() * CONFIG.gridSize);
+            const z = Math.floor(Math.random() * CONFIG.gridSize);
+
+            // Ensure empty spot
+            if (city.grid[x][z] === null) {
+                // Manually set data to Tier -2
+                city.grid[x][z] = { tier: -2, id: 'obstacle' };
+                spawnVisual(x, z, -2);
+                placed = true;
+            }
+            attempts++;
+        }
+    }
+}
+spawnObstacles();
+
 // New Game State Logic
 const gameState = {
     nextTier: 1,
@@ -601,6 +810,92 @@ const platform = new THREE.Mesh(platformGeo, platformMat);
 platform.position.y = -0.1;
 platform.receiveShadow = true;
 scene.add(platform);
+
+// --- ENVIRONMENT DECORATION ---
+function generateEnvironment() {
+    const envGroup = new THREE.Group();
+    scene.add(envGroup);
+
+    // Trees
+    const treeGeo = new THREE.ConeGeometry(0.5, 1.5, 8);
+    const trunkGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.5, 8);
+
+    // Reuse materials or create new ones
+    const treeMat = new THREE.MeshStandardMaterial({ color: 0x2d6a4f, roughness: 0.8, flatShading: true });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9, flatShading: true });
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.6, flatShading: true });
+
+    // Place randomly in a ring
+    // Reduced count to avoid clutter now that we have trees on board
+    const count = 20;
+    const minR = (CONFIG.gridSize * CONFIG.tileSize) / 2 + 4; // Pushed further out
+    const maxR = minR + 12;
+
+    for(let i=0; i<count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = minR + Math.random() * (maxR - minR);
+
+        const x = Math.cos(angle) * r;
+        const z = Math.sin(angle) * r;
+
+        // Chance for Tree or Rock
+        const type = Math.random() > 0.3 ? 'tree' : 'rock';
+
+        const obj = new THREE.Group();
+        obj.position.set(x, -0.2, z);
+
+        if (type === 'tree') {
+            // Trunk
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 0.25;
+            trunk.castShadow = true;
+            obj.add(trunk);
+
+            // Leaves (2-3 tiers)
+            const levels = 2 + Math.floor(Math.random() * 2);
+            for(let j=0; j<levels; j++) {
+                const leaves = new THREE.Mesh(treeGeo, treeMat);
+                const s = 1.0 - (j * 0.2);
+                leaves.scale.set(s, s, s);
+                leaves.position.y = 0.5 + (j * 0.6);
+                leaves.castShadow = true;
+                obj.add(leaves);
+            }
+        } else {
+            // Rock
+            const rockGeo = new THREE.DodecahedronGeometry(0.5);
+            const rock = new THREE.Mesh(rockGeo, rockMat);
+            rock.castShadow = true;
+            rock.scale.set(1 + Math.random(), 0.5 + Math.random()*0.5, 1 + Math.random());
+            obj.add(rock);
+        }
+
+        // Floating Island Base
+        const islandGeo = new THREE.CylinderGeometry(1.5, 0.5, 1, 7);
+        const islandMat = new THREE.MeshStandardMaterial({ color: 0x7abf7a, flatShading: true });
+        const island = new THREE.Mesh(islandGeo, islandMat);
+        island.position.y = -0.5;
+        island.receiveShadow = true;
+        obj.add(island);
+
+        // Random scale variation
+        const scale = 0.8 + Math.random() * 0.4;
+        obj.scale.setScalar(scale);
+
+        // Animate floating
+        gsap.to(obj.position, {
+            y: obj.position.y + 0.2,
+            duration: 2 + Math.random() * 2,
+            yoyo: true,
+            repeat: -1,
+            ease: "sine.inOut",
+            delay: Math.random() * 2
+        });
+
+        envGroup.add(obj);
+    }
+}
+generateEnvironment();
 
 // Helper: Spawn Visual
 function spawnVisual(x, z, tier) {
@@ -727,6 +1022,7 @@ window.addEventListener('mousedown', (event) => {
         const gx = Math.round((point.x + offset) / CONFIG.tileSize);
         const gz = Math.round((point.z + offset) / CONFIG.tileSize);
 
+        // Can build on Empty (null) or Road (-1). CANNOT build on Obstacle (-2) or Building (>0)
         if (city.isValid(gx, gz) && (city.grid[gx][gz] === null || city.grid[gx][gz].tier === -1)) {
             // Place Building
             city.place(gx, gz, gameState.nextTier);
@@ -768,6 +1064,12 @@ function resolveMerges(x, z) {
             const newTier = currentTier + 1;
             city.place(x, z, newTier);
             spawnVisual(x, z, newTier);
+
+            // Particles!
+            if (newTier <= 10) {
+                 const color = PALETTE[newTier - 1];
+                 particleSystem.spawn(x, z, color);
+            }
 
             // Recursive check
             resolveMerges(x, z);
@@ -1027,6 +1329,8 @@ function animate() {
 
     const dt = clock.getDelta();
     avatarManager.update(dt);
+    particleSystem.update(dt);
+    cloudSystem.update(dt);
 
     // Update UI
     const popCountEl = document.getElementById('pop-count');
