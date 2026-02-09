@@ -65,17 +65,27 @@ const TextureFactory = {
         return tex;
     },
 
-    // 1. Basic Grid (Windows)
+    // 1. Basic Grid (High Tech)
     grid: function (bgColor, lineColor) {
         return this.createTexture((ctx, w, h) => {
             ctx.fillStyle = bgColor;
             ctx.fillRect(0, 0, w, h);
-            ctx.strokeStyle = lineColor;
-            ctx.lineWidth = 8; // Thicker lines for readability
-            const step = 64;
 
-            // Draw Grid
-            for (let i = step; i < w; i += step) {
+            // Hex/Tech Pattern
+            ctx.fillStyle = "rgba(255,255,255,0.1)";
+            const step = 32;
+            for(let y=0; y<h; y+=step) {
+                for(let x=0; x<w; x+=step) {
+                    if ((x+y)% (step*2) === 0) {
+                        ctx.fillRect(x, y, step, step);
+                    }
+                }
+            }
+
+            // Main Grid
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 6;
+            for (let i = 64; i < w; i += 64) {
                 ctx.beginPath();
                 ctx.moveTo(i, 0);
                 ctx.lineTo(i, h);
@@ -87,6 +97,12 @@ const TextureFactory = {
                 ctx.stroke();
             }
 
+            // Glowing centers
+            ctx.fillStyle = "#ffffff";
+            ctx.globalAlpha = 0.5;
+            ctx.fillRect(w/2 - 20, h/2 - 20, 40, 40);
+            ctx.globalAlpha = 1.0;
+
             // Border
             ctx.strokeRect(0, 0, w, h);
         });
@@ -95,22 +111,61 @@ const TextureFactory = {
     // 2. Residential (Door + Windows)
     residential: function (wallColor, windowColor) {
         return this.createTexture((ctx, w, h) => {
+            // Wall Base
             ctx.fillStyle = wallColor;
             ctx.fillRect(0, 0, w, h);
 
-            // Windows
-            ctx.fillStyle = windowColor;
-            const pad = 40;
-            const winSize = 60;
+            // Add subtle noise
+            ctx.fillStyle = "rgba(0,0,0,0.05)";
+            for(let i=0; i<1000; i++) {
+                ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+            }
 
-            // Top Left
-            ctx.fillRect(pad, pad, winSize, winSize);
-            // Top Right
-            ctx.fillRect(w - pad - winSize, pad, winSize, winSize);
+            // Windows
+            const cols = 2;
+            const rows = 3;
+            const padX = 30;
+            const padY = 30;
+            const winW = (w - (padX * (cols + 1))) / cols;
+            const winH = (h - 100 - (padY * (rows + 1))) / rows; // Reserve bottom 100 for door
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const wx = padX + c * (winW + padX);
+                    const wy = padY + r * (winH + padY);
+
+                    // Frame
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(wx - 4, wy - 4, winW + 8, winH + 8);
+
+                    // Glass
+                    ctx.fillStyle = windowColor;
+                    ctx.fillRect(wx, wy, winW, winH);
+
+                    // Reflection/Detail
+                    ctx.fillStyle = "rgba(255,255,255,0.3)";
+                    ctx.fillRect(wx, wy, winW, winH/2);
+                }
+            }
 
             // Door (Bottom Center)
+            const doorW = 60;
+            const doorH = 90;
+            const dx = (w - doorW) / 2;
+            const dy = h - doorH;
+
+            // Door Frame
+            ctx.fillStyle = "#5d4037";
+            ctx.fillRect(dx - 5, dy - 5, doorW + 10, doorH + 5);
+
             ctx.fillStyle = "#3e2723"; // Dark Wood
-            ctx.fillRect((w / 2) - 30, h - 100, 60, 100);
+            ctx.fillRect(dx, dy, doorW, doorH);
+
+            // Knob
+            ctx.fillStyle = "#ffd700";
+            ctx.beginPath();
+            ctx.arc(dx + doorW - 10, dy + doorH/2, 3, 0, Math.PI * 2);
+            ctx.fill();
         });
     },
 
@@ -120,12 +175,26 @@ const TextureFactory = {
             ctx.fillStyle = baseColor;
             ctx.fillRect(0, 0, w, h);
 
-            ctx.fillStyle = glassColor;
-            const numStripes = 3;
-            const stripeHeight = h / (numStripes * 2.5);
+            // Glass Curtain Wall
+            const rows = 6;
+            const cols = 4;
+            const gap = 10;
+            const winW = (w - gap * (cols + 1)) / cols;
+            const winH = (h - gap * (rows + 1)) / rows;
 
-            for (let i = 1; i <= numStripes; i++) {
-                ctx.fillRect(20, i * stripeHeight * 2, w - 40, stripeHeight);
+            for(let r=0; r<rows; r++){
+                for(let c=0; c<cols; c++){
+                    const wx = gap + c*(winW+gap);
+                    const wy = gap + r*(winH+gap);
+
+                    // Gradient Glass
+                    const grd = ctx.createLinearGradient(wx, wy, wx, wy+winH);
+                    grd.addColorStop(0, glassColor);
+                    grd.addColorStop(1, "#37474f"); // Darker at bottom
+
+                    ctx.fillStyle = grd;
+                    ctx.fillRect(wx, wy, winW, winH);
+                }
             }
         });
     },
@@ -306,66 +375,159 @@ function createBuildingMesh(tier) {
 
     // Procedural Shapes based on Tier
     if (t === 1) {
-        // Small House
-        mesh = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        mesh.scale.set(0.8, 0.5, 0.8);
-        mesh.position.y = 0.25;
+        // Tier 1: Cottage
+        mesh = new THREE.Group();
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(0.8, 0.5, 0.8);
+        base.position.y = 0.25;
+        mesh.add(base);
+
+        const roof = new THREE.Mesh(ASSETS.geometries.cone, roofMat);
+        roof.scale.set(1.1, 1, 1.1);
+        roof.position.y = 0.7; // 0.5 + 0.2
+        roof.rotation.y = Math.PI / 4;
+        mesh.add(roof);
+
+        const chimney = new THREE.Mesh(ASSETS.geometries.box, roofMat);
+        chimney.scale.set(0.15, 0.4, 0.15);
+        chimney.position.set(0.2, 0.6, 0.2);
+        mesh.add(chimney);
     }
     else if (t === 2) {
-        // Tall House / Apartment
-        mesh = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        mesh.scale.set(0.6, 0.8, 0.6);
-        mesh.position.y = 0.4;
+        // Tier 2: Townhouse with Awning
+        mesh = new THREE.Group();
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(0.7, 0.9, 0.7);
+        base.position.y = 0.45;
+        mesh.add(base);
+
+        // Flat Roof rim
+        const rim = new THREE.Mesh(ASSETS.geometries.box, roofMat);
+        rim.scale.set(0.75, 0.05, 0.75);
+        rim.position.y = 0.925;
+        mesh.add(rim);
+
+        // Awning
+        const awning = new THREE.Mesh(ASSETS.geometries.box, roofMat);
+        awning.scale.set(0.3, 0.05, 0.2);
+        awning.position.set(0, 0.25, 0.4);
+        mesh.add(awning);
     }
     else if (t === 3) {
-        // Complex House
+        // Tier 3: Apartment with Balconies
         mesh = new THREE.Group();
         const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        base.scale.set(0.8, 0.6, 0.8);
-        base.position.y = 0.3;
+        base.scale.set(0.85, 1.2, 0.85);
+        base.position.y = 0.6;
+        mesh.add(base);
 
-        const roof = new THREE.Mesh(ASSETS.geometries.cone, createPlasticMat(0x444444));
-        // Reset/Preset cone? Cone geometry is shared.
-        // It's already defined as 0.6, 0.4, 4. 
-        // We shouldn't scale accessors of shared geometry, but mesh.scale is fine.
-        roof.position.y = 0.8;
-        roof.rotation.y = Math.PI / 4;
-        mesh.add(base, roof);
+        // Roof Shed
+        const shed = new THREE.Mesh(ASSETS.geometries.box, roofMat);
+        shed.scale.set(0.4, 0.2, 0.4);
+        shed.position.y = 1.3;
+        mesh.add(shed);
+
+        // Random Balconies
+        const balMat = createPlasticMat(0xdddddd);
+        for(let i=0; i<3; i++) {
+            const b = new THREE.Mesh(ASSETS.geometries.box, balMat);
+            b.scale.set(0.25, 0.05, 0.1);
+            b.position.set(0, 0.4 + (i*0.3), 0.45);
+            mesh.add(b);
+        }
     }
-    else if (t >= 4 && t <= 6) {
-        // Tower Block
+    else if (t === 4) {
+        // Tier 4: Stepped Office
+        mesh = new THREE.Group();
+        const b1 = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        b1.scale.set(0.9, 0.6, 0.9);
+        b1.position.y = 0.3;
+        mesh.add(b1);
+
+        const b2 = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        b2.scale.set(0.6, 1.2, 0.6); // Overlaps b1
+        b2.position.y = 0.6;
+        mesh.add(b2);
+
+        // HVAC
+        const ac = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x888888));
+        ac.scale.set(0.2, 0.15, 0.2);
+        ac.position.set(0.1, 1.275, 0);
+        mesh.add(ac);
+    }
+    else if (t === 5) {
+        // Tier 5: High Rise with Fins
         mesh = new THREE.Group();
         const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        base.scale.set(0.6, 1 + (t * 0.2), 0.6);
-        base.position.y = (1 + (t * 0.2)) / 2;
+        base.scale.set(0.7, 1.8, 0.7);
+        base.position.y = 0.9;
+        mesh.add(base);
 
-        const top = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0xffffff));
-        top.scale.set(0.4, 0.2, 0.4);
-        top.position.y = 1 + (t * 0.2) + 0.1;
-        mesh.add(base, top);
+        // Fins
+        const finMat = createPlasticMat(0x555555);
+        const f1 = new THREE.Mesh(ASSETS.geometries.box, finMat);
+        f1.scale.set(0.8, 1.7, 0.1);
+        f1.position.y = 0.85;
+        f1.position.z = 0;
+        mesh.add(f1);
+
+        const f2 = new THREE.Mesh(ASSETS.geometries.box, finMat);
+        f2.scale.set(0.1, 1.7, 0.8);
+        f2.position.y = 0.85;
+        f2.position.x = 0;
+        mesh.add(f2);
+    }
+    else if (t === 6) {
+        // Tier 6: Twin Tower / Complex
+        mesh = new THREE.Group();
+        const h = 2.2;
+
+        const t1 = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        t1.scale.set(0.35, h, 0.35);
+        t1.position.set(-0.2, h/2, -0.2);
+        mesh.add(t1);
+
+        const t2 = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        t2.scale.set(0.35, h*0.8, 0.35);
+        t2.position.set(0.2, (h*0.8)/2, 0.2);
+        mesh.add(t2);
+
+        // Bridge
+        const bridge = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x333333));
+        bridge.scale.set(0.6, 0.1, 0.1);
+        bridge.position.set(0, h*0.5, 0);
+        mesh.add(bridge);
     }
     else {
-        // Skyscraper / Rocket
+        // Tier 7-10: Sci-Fi Spire
         mesh = new THREE.Group();
 
-        // Cylinder Geometry reused (1,1,1) -> scaled
-        const bodyHeight = 1 + (t * 0.3);
+        const h = 1.5 + (t * 0.25);
+        const w = 0.4;
+
+        // Main Shaft
         const body = new THREE.Mesh(ASSETS.geometries.cylinder, cylMaterials);
-        body.scale.set(0.2, bodyHeight, 0.2); // Radius 0.2 (from 1), Height bodyHeight (from 1)
-        // Original was CylinderGeometry(0.2, 0.4, ...). Top radius 0.2, bottom 0.4.
-        // Our shared cylinder is 1, 1. We can't easily change top/bottom radius ratio with scale alone effectively if we want 0.2 to 0.4 taper.
-        // For simplicity/performance, let's just use a straight cylinder or create a tapered one if strictly needed.
-        // Let's stick to straight cylinder for performance reuse, or make a specific tapered geometry.
-        // Actually, let's just make a dedicated tapered geometry for this if we want to keep the look roughly same.
-        // Or just accept straight cylinder.
-        // Let's create a specific Geometry for skyscrapers if needed, but for now straight is fine.
+        body.scale.set(w, h, w);
+        body.position.y = h/2;
+        mesh.add(body);
 
-        body.position.y = bodyHeight / 2;
+        // Floating Rings
+        const numRings = t - 5;
+        for(let i=0; i<numRings; i++) {
+            const r = new THREE.Mesh(ASSETS.geometries.torus, createPlasticMat(0xffffff));
+            const y = (h * 0.2) + (i * (h/numRings) * 0.6);
+            r.position.y = y;
+            r.rotation.x = Math.PI / 2;
+            const s = 1 + (i*0.2);
+            r.scale.set(s, s, 1);
+            mesh.add(r);
+        }
 
-        const ring = new THREE.Mesh(ASSETS.geometries.torus, createPlasticMat(0xffffff));
-        ring.position.y = (t * 0.2);
-        ring.rotation.x = Math.PI / 2;
-        mesh.add(body, ring);
+        // Antenna
+        const ant = new THREE.Mesh(ASSETS.geometries.cylinder, createPlasticMat(0xaaaaaa));
+        ant.scale.set(0.05, 0.8, 0.05);
+        ant.position.y = h + 0.4;
+        mesh.add(ant);
     }
 
     // Enable Shadows for all parts
