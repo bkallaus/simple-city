@@ -1236,18 +1236,30 @@ function resolveMerges(x, z) {
 
         // Delay spawn of upgrade to let shrink animation play
         setTimeout(() => {
-            const newTier = currentTier + 1;
-            city.place(x, z, newTier);
-            spawnVisual(x, z, newTier);
+            try {
+                const newTier = currentTier + 1;
+                const placed = city.place(x, z, newTier);
 
-            // Particles!
-            if (newTier <= 10) {
-                 const color = PALETTE[newTier - 1];
-                 particleSystem.spawn(x, z, color);
+                if (!placed) {
+                    console.warn(`Failed to place tier ${newTier} at ${x},${z}`);
+                    gameState.isBusy = false;
+                    return;
+                }
+
+                spawnVisual(x, z, newTier);
+
+                // Particles!
+                if (newTier <= 10) {
+                     const color = PALETTE[newTier - 1];
+                     particleSystem.spawn(x, z, color);
+                }
+
+                // Recursive check
+                resolveMerges(x, z);
+            } catch (e) {
+                console.error("Error in resolveMerges:", e);
+                gameState.isBusy = false;
             }
-
-            // Recursive check
-            resolveMerges(x, z);
         }, 150);
     } else {
         gameState.isBusy = false;
