@@ -30,6 +30,18 @@ renderer.shadowMap.enabled = true; // Enable Shadows
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
+// --- CONTROLS ---
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.mouseButtons = {
+    LEFT: null, // Reserved for game interaction
+    MIDDLE: THREE.MOUSE.PAN,
+    RIGHT: THREE.MOUSE.ROTATE
+};
+controls.minZoom = 0.5;
+controls.maxZoom = 2;
+
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambientLight);
@@ -1168,8 +1180,9 @@ window.addEventListener('mousemove', (event) => {
 });
 
 // Click Listener
-window.addEventListener('mousedown', (event) => {
+window.addEventListener('pointerdown', (event) => {
     if (gameState.isGameOver || gameState.isBusy) return;
+    if (event.button !== 0) return; // Only process Left Click for buildings
 
     // Reuse mouse coordinates from mousemove if available, or update them
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -1488,6 +1501,8 @@ const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
+
+    controls.update();
 
     const dt = clock.getDelta();
     avatarManager.update(dt);
