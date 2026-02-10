@@ -65,136 +65,142 @@ const TextureFactory = {
         return tex;
     },
 
-    // 1. Basic Grid (High Tech)
+    // 1. Cobblestone Grid (Industrial Base)
     grid: function (bgColor, lineColor) {
         return this.createTexture((ctx, w, h) => {
-            ctx.fillStyle = bgColor;
+            ctx.fillStyle = "#555"; // Dark Stone
             ctx.fillRect(0, 0, w, h);
 
-            // Hex/Tech Pattern
-            ctx.fillStyle = "rgba(255,255,255,0.1)";
-            const step = 32;
-            for(let y=0; y<h; y+=step) {
-                for(let x=0; x<w; x+=step) {
-                    if ((x+y)% (step*2) === 0) {
-                        ctx.fillRect(x, y, step, step);
-                    }
-                }
+            // Stones
+            ctx.fillStyle = "#666";
+            const numStones = 150;
+            for(let i=0; i<numStones; i++) {
+                const sx = Math.random() * w;
+                const sy = Math.random() * h;
+                const sw = 10 + Math.random() * 20;
+                const sh = 10 + Math.random() * 20;
+                ctx.fillRect(sx, sy, sw, sh);
             }
 
             // Main Grid
-            ctx.strokeStyle = lineColor;
-            ctx.lineWidth = 6;
-            for (let i = 64; i < w; i += 64) {
-                ctx.beginPath();
-                ctx.moveTo(i, 0);
-                ctx.lineTo(i, h);
-                ctx.stroke();
-
-                ctx.beginPath();
-                ctx.moveTo(0, i);
-                ctx.lineTo(w, i);
-                ctx.stroke();
-            }
-
-            // Glowing centers
-            ctx.fillStyle = "#ffffff";
-            ctx.globalAlpha = 0.5;
-            ctx.fillRect(w/2 - 20, h/2 - 20, 40, 40);
-            ctx.globalAlpha = 1.0;
-
-            // Border
+            ctx.strokeStyle = "rgba(0,0,0,0.3)";
+            ctx.lineWidth = 4;
+            // No strict grid lines for cobblestone, just border
             ctx.strokeRect(0, 0, w, h);
         });
     },
 
-    // 2. Residential (Door + Windows)
+    // 2. Brick Residential (Victorian)
     residential: function (wallColor, windowColor) {
         return this.createTexture((ctx, w, h) => {
-            // Wall Base
+            // Brick Pattern
             ctx.fillStyle = wallColor;
             ctx.fillRect(0, 0, w, h);
 
-            // Add subtle noise
-            ctx.fillStyle = "rgba(0,0,0,0.05)";
-            for(let i=0; i<1000; i++) {
-                ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+            ctx.fillStyle = "rgba(0,0,0,0.15)";
+            const brickH = 16;
+            const brickW = 32;
+            for(let y=0; y<h; y+=brickH) {
+                const offset = (y/brickH) % 2 === 0 ? 0 : brickW/2;
+                for(let x=-brickW; x<w; x+=brickW) {
+                    ctx.fillRect(x + offset, y, brickW-2, brickH-2);
+                }
             }
 
-            // Windows
+            // Windows (Tall Victorian Sash)
             const cols = 2;
-            const rows = 3;
-            const padX = 30;
-            const padY = 30;
+            const rows = 2;
+            const padX = 40;
+            const padY = 40;
             const winW = (w - (padX * (cols + 1))) / cols;
-            const winH = (h - 100 - (padY * (rows + 1))) / rows; // Reserve bottom 100 for door
+            const winH = 80;
+
+            ctx.fillStyle = "#222"; // Dark frame
+            ctx.strokeStyle = "#443322"; // Dark Wood trim
+            ctx.lineWidth = 4;
 
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
                     const wx = padX + c * (winW + padX);
                     const wy = padY + r * (winH + padY);
 
-                    // Frame
-                    ctx.fillStyle = "#ffffff";
+                    // Frame & Glass
                     ctx.fillRect(wx - 4, wy - 4, winW + 8, winH + 8);
 
-                    // Glass
-                    ctx.fillStyle = windowColor;
+                    // Warm Light
+                    ctx.fillStyle = "#ffddaa"; // Warm candlelight
                     ctx.fillRect(wx, wy, winW, winH);
 
-                    // Reflection/Detail
-                    ctx.fillStyle = "rgba(255,255,255,0.3)";
-                    ctx.fillRect(wx, wy, winW, winH/2);
+                    // Sash (Cross)
+                    ctx.beginPath();
+                    ctx.moveTo(wx + winW/2, wy);
+                    ctx.lineTo(wx + winW/2, wy + winH);
+                    ctx.moveTo(wx, wy + winH/2);
+                    ctx.lineTo(wx + winW, wy + winH/2);
+                    ctx.stroke();
+
+                    // Reset fill for next iteration/bricks
+                    ctx.fillStyle = "#222";
                 }
             }
 
-            // Door (Bottom Center)
-            const doorW = 60;
-            const doorH = 90;
+            // Door (Arched top ideally, but box is fine)
+            const doorW = 50;
+            const doorH = 80;
             const dx = (w - doorW) / 2;
             const dy = h - doorH;
 
-            // Door Frame
-            ctx.fillStyle = "#5d4037";
-            ctx.fillRect(dx - 5, dy - 5, doorW + 10, doorH + 5);
-
-            ctx.fillStyle = "#3e2723"; // Dark Wood
+            ctx.fillStyle = "#2a1a10"; // Dark Oak
             ctx.fillRect(dx, dy, doorW, doorH);
 
-            // Knob
-            ctx.fillStyle = "#ffd700";
-            ctx.beginPath();
-            ctx.arc(dx + doorW - 10, dy + doorH/2, 3, 0, Math.PI * 2);
-            ctx.fill();
+            // Panels
+            ctx.fillStyle = "#3e2723";
+            ctx.fillRect(dx+5, dy+5, doorW-10, doorH/2-10);
+            ctx.fillRect(dx+5, dy+doorH/2+5, doorW-10, doorH/2-10);
         });
     },
 
-    // 3. Commercial (Stripes/Glass)
+    // 3. Wood Siding / Industrial Factory (Horizontal Lines)
     commercial: function (baseColor, glassColor) {
         return this.createTexture((ctx, w, h) => {
             ctx.fillStyle = baseColor;
             ctx.fillRect(0, 0, w, h);
 
-            // Glass Curtain Wall
-            const rows = 6;
-            const cols = 4;
-            const gap = 10;
-            const winW = (w - gap * (cols + 1)) / cols;
-            const winH = (h - gap * (rows + 1)) / rows;
+            // Horizontal Siding or Corrugated Metal
+            ctx.fillStyle = "rgba(0,0,0,0.1)";
+            const slatH = 12;
+            for(let y=0; y<h; y+=slatH) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke(); // Thin lines
+            }
 
-            for(let r=0; r<rows; r++){
-                for(let c=0; c<cols; c++){
-                    const wx = gap + c*(winW+gap);
-                    const wy = gap + r*(winH+gap);
+            // Factory Windows (Grid of small panes)
+            const winW = w - 40;
+            const winH = h / 3;
+            const wx = 20;
+            const wy = h / 3;
 
-                    // Gradient Glass
-                    const grd = ctx.createLinearGradient(wx, wy, wx, wy+winH);
-                    grd.addColorStop(0, glassColor);
-                    grd.addColorStop(1, "#37474f"); // Darker at bottom
+            ctx.fillStyle = "#1a1a1a"; // Iron Frame
+            ctx.fillRect(wx-4, wy-4, winW+8, winH+8);
 
-                    ctx.fillStyle = grd;
-                    ctx.fillRect(wx, wy, winW, winH);
-                }
+            ctx.fillStyle = "#add8e6"; // Blueish industrial glass (cool contrast to warm brick)
+            ctx.fillRect(wx, wy, winW, winH);
+
+            // Muntins (Grid)
+            ctx.strokeStyle = "#1a1a1a";
+            ctx.lineWidth = 3;
+            const panesX = 4;
+            const panesY = 3;
+
+            for(let i=1; i<panesX; i++) {
+                const x = wx + (winW/panesX)*i;
+                ctx.beginPath(); ctx.moveTo(x, wy); ctx.lineTo(x, wy+winH); ctx.stroke();
+            }
+            for(let i=1; i<panesY; i++) {
+                const y = wy + (winH/panesY)*i;
+                ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(wx+winW, y); ctx.stroke();
             }
         });
     },
@@ -263,18 +269,18 @@ const TextureFactory = {
     }
 };
 
-// Color Palette
+// Color Palette (Cozy Victorian Industrial)
 const PALETTE = [
-    0xff6b6b, // T1: Red
-    0x4ecdc4, // T2: Teal
-    0xffd93d, // T3: Yellow
-    0x1a535c, // T4: Dark Teal
-    0xff9f43, // T5: Orange
-    0x5f27cd, // T6: Purple
-    0x54a0ff, // T7: Light Blue
-    0x2e86de, // T8: Darker Blue
-    0xee5253, // T9: Red-Orange
-    0xfeca57  // T10: Gold
+    0x8b4513, // T1: Saddle Brown (Wood Cottage)
+    0xa0522d, // T2: Sienna (Brick Townhouse)
+    0xcd853f, // T3: Peru (Warm Stone)
+    0x556b2f, // T4: Dark Olive Green (Painted Siding)
+    0x800000, // T5: Maroon (Deep Red Brick Factory)
+    0x708090, // T6: Slate Gray (Stone Warehouse)
+    0x2f4f4f, // T7: Dark Slate Gray (Ironworks)
+    0xb8860b, // T8: Dark Goldenrod (Brass/Copper details)
+    0x483d8b, // T9: Dark Slate Blue (Victorian Roof Slate)
+    0xd2691e  // T10: Chocolate (Grand Hall Brick)
 ];
 
 // Material Factory
@@ -373,9 +379,9 @@ function createBuildingMesh(tier) {
 
     let mesh;
 
-    // Procedural Shapes based on Tier
+    // Procedural Shapes based on Tier (Victorian / Industrial)
     if (t === 1) {
-        // Tier 1: Cottage
+        // Tier 1: Cozy Cottage (Steep Roof, Wood)
         mesh = new THREE.Group();
         const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
         base.scale.set(0.8, 0.5, 0.8);
@@ -383,151 +389,271 @@ function createBuildingMesh(tier) {
         mesh.add(base);
 
         const roof = new THREE.Mesh(ASSETS.geometries.cone, roofMat);
-        roof.scale.set(1.1, 1, 1.1);
-        roof.position.y = 0.7; // 0.5 + 0.2
+        roof.scale.set(1.0, 0.8, 1.0); // Slightly flatter cone than original but still steep
+        roof.position.y = 0.7;
         roof.rotation.y = Math.PI / 4;
         mesh.add(roof);
 
-        const chimney = new THREE.Mesh(ASSETS.geometries.box, roofMat);
-        chimney.scale.set(0.15, 0.4, 0.15);
-        chimney.position.set(0.2, 0.6, 0.2);
+        // Stone Chimney
+        const chimMat = createPlasticMat(0x555555);
+        const chimney = new THREE.Mesh(ASSETS.geometries.box, chimMat);
+        chimney.scale.set(0.2, 0.5, 0.2);
+        chimney.position.set(0.25, 0.5, 0.2);
         mesh.add(chimney);
     }
     else if (t === 2) {
-        // Tier 2: Townhouse with Awning
+        // Tier 2: Brick Townhouse (2 Story, Flat Roof with Cornice)
         mesh = new THREE.Group();
         const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
         base.scale.set(0.7, 0.9, 0.7);
         base.position.y = 0.45;
         mesh.add(base);
 
-        // Flat Roof rim
-        const rim = new THREE.Mesh(ASSETS.geometries.box, roofMat);
-        rim.scale.set(0.75, 0.05, 0.75);
-        rim.position.y = 0.925;
-        mesh.add(rim);
+        // Fancy Cornice
+        const cornice = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x3e2723));
+        cornice.scale.set(0.8, 0.1, 0.8);
+        cornice.position.y = 0.95;
+        mesh.add(cornice);
 
-        // Awning
-        const awning = new THREE.Mesh(ASSETS.geometries.box, roofMat);
-        awning.scale.set(0.3, 0.05, 0.2);
-        awning.position.set(0, 0.25, 0.4);
-        mesh.add(awning);
+        // Front Stoop
+        const stoop = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x555555));
+        stoop.scale.set(0.3, 0.2, 0.2);
+        stoop.position.set(0, 0.1, 0.4);
+        mesh.add(stoop);
     }
     else if (t === 3) {
-        // Tier 3: Apartment with Balconies
+        // Tier 3: Victorian Manor (Turret, Porch)
+        mesh = new THREE.Group();
+
+        // Main House
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(0.8, 0.8, 0.6); // Wide but shallow
+        base.position.y = 0.4;
+        mesh.add(base);
+
+        // Turret Base
+        const turretBase = new THREE.Mesh(ASSETS.geometries.cylinder, boxMaterials);
+        turretBase.scale.set(0.25, 1.2, 0.25);
+        turretBase.position.set(-0.35, 0.6, 0.25); // Corner
+        mesh.add(turretBase);
+
+        // Turret Roof
+        const turretRoof = new THREE.Mesh(ASSETS.geometries.cone, roofMat);
+        turretRoof.scale.set(0.35, 0.6, 0.35);
+        turretRoof.position.set(-0.35, 1.3, 0.25);
+        mesh.add(turretRoof);
+
+        // Main Roof (Gabled)
+        const mainRoof = new THREE.Mesh(ASSETS.geometries.cone, roofMat);
+        mainRoof.scale.set(1.0, 0.5, 0.8);
+        mainRoof.position.y = 0.9;
+        mainRoof.rotation.y = Math.PI / 4;
+        mesh.add(mainRoof);
+    }
+    else if (t === 4) {
+        // Tier 4: Small Factory (Sawtooth Roof)
         mesh = new THREE.Group();
         const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        base.scale.set(0.85, 1.2, 0.85);
+        base.scale.set(1.0, 0.6, 0.8);
+        base.position.y = 0.3;
+        mesh.add(base);
+
+        // Sawtooth / Skylights
+        const skyMat = createPlasticMat(0x88ccff);
+        for(let i=0; i<3; i++) {
+            const tooth = new THREE.Mesh(ASSETS.geometries.box, roofMat);
+            tooth.scale.set(1.0, 0.2, 0.25);
+            tooth.rotation.x = -Math.PI / 6; // Angled
+            tooth.position.set(0, 0.7, -0.25 + (i * 0.25));
+            mesh.add(tooth);
+        }
+
+        // Small Smokestack
+        const stack = new THREE.Mesh(ASSETS.geometries.cylinder, createPlasticMat(0x333333));
+        stack.scale.set(0.1, 0.8, 0.1);
+        stack.position.set(0.4, 0.6, 0.3);
+        mesh.add(stack);
+    }
+    else if (t === 5) {
+        // Tier 5: Large Brick Factory (Water Tower)
+        mesh = new THREE.Group();
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(0.9, 1.2, 0.9);
         base.position.y = 0.6;
         mesh.add(base);
 
-        // Roof Shed
-        const shed = new THREE.Mesh(ASSETS.geometries.box, roofMat);
-        shed.scale.set(0.4, 0.2, 0.4);
-        shed.position.y = 1.3;
-        mesh.add(shed);
+        // Water Tower on Roof
+        const tankLegs = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x444444));
+        tankLegs.scale.set(0.3, 0.4, 0.3);
+        tankLegs.position.set(0, 1.3, 0);
+        mesh.add(tankLegs);
 
-        // Random Balconies
-        const balMat = createPlasticMat(0xdddddd);
-        for(let i=0; i<3; i++) {
-            const b = new THREE.Mesh(ASSETS.geometries.box, balMat);
-            b.scale.set(0.25, 0.05, 0.1);
-            b.position.set(0, 0.4 + (i*0.3), 0.45);
-            mesh.add(b);
-        }
-    }
-    else if (t === 4) {
-        // Tier 4: Stepped Office
-        mesh = new THREE.Group();
-        const b1 = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        b1.scale.set(0.9, 0.6, 0.9);
-        b1.position.y = 0.3;
-        mesh.add(b1);
+        const tank = new THREE.Mesh(ASSETS.geometries.cylinder, createPlasticMat(0x8b4513)); // Wood tank
+        tank.scale.set(0.25, 0.3, 0.25);
+        tank.position.set(0, 1.5, 0);
+        mesh.add(tank);
 
-        const b2 = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        b2.scale.set(0.6, 1.2, 0.6); // Overlaps b1
-        b2.position.y = 0.6;
-        mesh.add(b2);
-
-        // HVAC
-        const ac = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x888888));
-        ac.scale.set(0.2, 0.15, 0.2);
-        ac.position.set(0.1, 1.275, 0);
-        mesh.add(ac);
-    }
-    else if (t === 5) {
-        // Tier 5: High Rise with Fins
-        mesh = new THREE.Group();
-        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        base.scale.set(0.7, 1.8, 0.7);
-        base.position.y = 0.9;
-        mesh.add(base);
-
-        // Fins
-        const finMat = createPlasticMat(0x555555);
-        const f1 = new THREE.Mesh(ASSETS.geometries.box, finMat);
-        f1.scale.set(0.8, 1.7, 0.1);
-        f1.position.y = 0.85;
-        f1.position.z = 0;
-        mesh.add(f1);
-
-        const f2 = new THREE.Mesh(ASSETS.geometries.box, finMat);
-        f2.scale.set(0.1, 1.7, 0.8);
-        f2.position.y = 0.85;
-        f2.position.x = 0;
-        mesh.add(f2);
+        // Roof Vent
+        const vent = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x666666));
+        vent.scale.set(0.2, 0.2, 0.2);
+        vent.position.set(0.3, 1.3, 0.3);
+        mesh.add(vent);
     }
     else if (t === 6) {
-        // Tier 6: Twin Tower / Complex
+        // Tier 6: Industrial Warehouse / Loft
         mesh = new THREE.Group();
-        const h = 2.2;
+        const h = 1.5;
 
-        const t1 = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        t1.scale.set(0.35, h, 0.35);
-        t1.position.set(-0.2, h/2, -0.2);
-        mesh.add(t1);
+        // Wide Base
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(1.1, h, 0.8);
+        base.position.y = h/2;
+        mesh.add(base);
 
-        const t2 = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
-        t2.scale.set(0.35, h*0.8, 0.35);
-        t2.position.set(0.2, (h*0.8)/2, 0.2);
-        mesh.add(t2);
+        // Loading Dock Overhang
+        const overhang = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x222222));
+        overhang.scale.set(1.2, 0.05, 0.3);
+        overhang.position.set(0, 0.4, 0.45); // Front
+        mesh.add(overhang);
 
-        // Bridge
-        const bridge = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x333333));
-        bridge.scale.set(0.6, 0.1, 0.1);
-        bridge.position.set(0, h*0.5, 0);
-        mesh.add(bridge);
+        // Roof Details (HVAC)
+        const ac = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x999999));
+        ac.scale.set(0.3, 0.2, 0.3);
+        ac.position.set(-0.3, h+0.1, 0);
+        mesh.add(ac);
     }
-    else {
-        // Tier 7-10: Sci-Fi Spire
+    else if (t === 7) {
+        // Tier 7: Clock Tower (Stone)
         mesh = new THREE.Group();
+        const h = 2.5;
 
-        const h = 1.5 + (t * 0.25);
-        const w = 0.4;
+        // Tower Shaft
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(0.5, h, 0.5);
+        base.position.y = h/2;
+        mesh.add(base);
 
-        // Main Shaft
-        const body = new THREE.Mesh(ASSETS.geometries.cylinder, cylMaterials);
-        body.scale.set(w, h, w);
-        body.position.y = h/2;
-        mesh.add(body);
+        // Clock Face Cube
+        const clockBox = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0xeeeeee)); // White face
+        clockBox.scale.set(0.55, 0.55, 0.55);
+        clockBox.position.y = h - 0.5;
+        mesh.add(clockBox);
 
-        // Floating Rings
-        const numRings = t - 5;
-        for(let i=0; i<numRings; i++) {
-            const r = new THREE.Mesh(ASSETS.geometries.torus, createPlasticMat(0xffffff));
-            const y = (h * 0.2) + (i * (h/numRings) * 0.6);
-            r.position.y = y;
-            r.rotation.x = Math.PI / 2;
-            const s = 1 + (i*0.2);
-            r.scale.set(s, s, 1);
-            mesh.add(r);
+        // Spire
+        const spire = new THREE.Mesh(ASSETS.geometries.cone, roofMat);
+        spire.scale.set(0.6, 0.8, 0.6);
+        spire.position.y = h + 0.1;
+        spire.rotation.y = Math.PI/4;
+        mesh.add(spire);
+    }
+    else if (t === 8) {
+        // Tier 8: Grand Hotel (Mansard Roof)
+        mesh = new THREE.Group();
+        const h = 2.0;
+
+        // Main Block
+        const base = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        base.scale.set(0.9, h, 0.9);
+        base.position.y = h/2;
+        mesh.add(base);
+
+        // Mansard Roof (Truncated Pyramid look via scaling)
+        // We can mimic this with a box + smaller box or a specific geometry.
+        // Let's use a dark box with slightly smaller top
+        const roofBase = new THREE.Mesh(ASSETS.geometries.cone, roofMat); // Cone actually
+        // 4 sided cone = pyramid
+        roofBase.scale.set(1.0, 0.6, 1.0);
+        roofBase.position.y = h + 0.3;
+        roofBase.rotation.y = Math.PI/4;
+        mesh.add(roofBase);
+
+        // Dormer Windows (Tiny boxes sticking out of roof)
+        const dormerMat = createPlasticMat(0xffffff);
+        for(let i=0; i<4; i++) {
+            const d = new THREE.Mesh(ASSETS.geometries.box, dormerMat);
+            d.scale.set(0.15, 0.15, 0.15);
+            // Position on 4 sides
+            const angle = (i * Math.PI) / 2;
+            d.position.set(Math.sin(angle)*0.3, h+0.2, Math.cos(angle)*0.3);
+            mesh.add(d);
+        }
+    }
+    else if (t === 9) {
+        // Tier 9: Ironworks Spire
+        mesh = new THREE.Group();
+        const h = 3.0;
+
+        // Lattice Structure (Simulated with thin cylinder)
+        const strutMat = createPlasticMat(0x2f4f4f);
+
+        // 4 Legs
+        const legGeo = ASSETS.geometries.cylinder;
+        const spread = 0.3;
+        const positions = [[1,1], [1,-1], [-1,1], [-1,-1]];
+
+        positions.forEach(pos => {
+            const leg = new THREE.Mesh(legGeo, strutMat);
+            leg.scale.set(0.05, h, 0.05);
+            // Angle them inward? Complicated rotation. Keep straight for now.
+            leg.position.set(pos[0]*spread/2, h/2, pos[1]*spread/2);
+            mesh.add(leg);
+        });
+
+        // Cross braces (Rings)
+        for(let i=1; i<5; i++) {
+            const ring = new THREE.Mesh(ASSETS.geometries.torus, strutMat);
+            ring.scale.set(1.0, 1.0, 1.0); // Torus is 0.3 radius, so 0.6 dia
+            // We want diameter approx 0.3 (spread)
+            // 0.6 * s = 0.3 -> s = 0.5
+            ring.scale.set(0.6, 0.6, 1);
+            ring.position.y = i * (h/5);
+            ring.rotation.x = Math.PI/2;
+            mesh.add(ring);
         }
 
-        // Antenna
-        const ant = new THREE.Mesh(ASSETS.geometries.cylinder, createPlasticMat(0xaaaaaa));
-        ant.scale.set(0.05, 0.8, 0.05);
-        ant.position.y = h + 0.4;
-        mesh.add(ant);
+        // Top Smoke
+        const top = new THREE.Mesh(ASSETS.geometries.cone, strutMat);
+        top.scale.set(0.5, 0.5, 0.5);
+        top.position.y = h;
+        mesh.add(top);
+    }
+    else {
+        // Tier 10: Monument / Capitol (Dome)
+        mesh = new THREE.Group();
+        const h = 1.8;
+
+        // Base Steps
+        const steps = new THREE.Mesh(ASSETS.geometries.box, createPlasticMat(0x888888));
+        steps.scale.set(1.1, 0.2, 1.1);
+        steps.position.y = 0.1;
+        mesh.add(steps);
+
+        // Main Hall
+        const hall = new THREE.Mesh(ASSETS.geometries.box, boxMaterials);
+        hall.scale.set(0.9, h, 0.9);
+        hall.position.y = h/2 + 0.1;
+        mesh.add(hall);
+
+        // Columns (Front)
+        const colMat = createPlasticMat(0xdddddd); // Marble
+        for(let i=-1; i<=1; i+=0.5) {
+             const col = new THREE.Mesh(ASSETS.geometries.cylinder, colMat);
+             col.scale.set(0.08, h, 0.08);
+             col.position.set(i*0.35, h/2+0.1, 0.5); // Front face
+             mesh.add(col);
+        }
+
+        // Dome (Sphere half?) We only have cone/cylinder/box/torus in ASSETS.
+        // Let's make a sphere if not exists, or reuse/approximate.
+        // Actually we can add sphere to ASSETS.
+        if (!ASSETS.geometries.sphere) {
+            ASSETS.geometries.sphere = new THREE.SphereGeometry(0.5, 16, 16);
+        }
+
+        const dome = new THREE.Mesh(ASSETS.geometries.sphere, createPlasticMat(0xb8860b)); // Gold/Copper Dome
+        dome.scale.set(0.9, 0.9, 0.9);
+        dome.position.y = h + 0.3;
+        mesh.add(dome);
     }
 
     // Enable Shadows for all parts
@@ -950,13 +1076,7 @@ class Avatar {
         const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
         const mat = getMaterial('standard', { color: color });
 
-        // Reuse cone geometry
-        // ConeGeometry(0.1, 0.3, 8)
-        // Shared cone is (0.6, 0.4, 4). 
-        // Let's create a specific avatar cone or scale the shared one?
-        // Scaling smooth cone (8 segments) from low poly (4 segments) looks bad.
-        // Let's add a specific avatar geometry to assets if not present, or just make one here for sharing.
-
+        // Reuse or create avatar geometry
         if (!ASSETS.geometries.avatar) {
             ASSETS.geometries.avatar = new THREE.ConeGeometry(0.1, 0.3, 8);
         }
