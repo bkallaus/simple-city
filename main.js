@@ -1221,10 +1221,17 @@ function resolveMerges(x, z) {
     }
 
     const currentTier = city.grid[x][z].tier;
-    if (currentTier === -1) { // Don't merge roads
+    if (currentTier === -1 || currentTier === -2) { // Don't merge roads or obstacles
         gameState.isBusy = false;
         return;
     }
+
+    // Cap max level at 10
+    if (currentTier >= 10) {
+        gameState.isBusy = false;
+        return;
+    }
+
     const cluster = city.floodFill(x, z, currentTier, new Set());
 
     if (cluster.length >= 3) {
