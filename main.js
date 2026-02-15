@@ -1511,6 +1511,11 @@ function resetGame() {
 // Render Loop
 const clock = new THREE.Clock();
 
+// UI Elements
+const popCountEl = document.getElementById('pop-count');
+const buildingCountEl = document.getElementById('building-count');
+const nextTierEl = document.getElementById('next-tier-display');
+
 function animate() {
     requestAnimationFrame(animate);
 
@@ -1522,10 +1527,16 @@ function animate() {
     cloudSystem.update(dt);
 
     // Update UI
-    const popCountEl = document.getElementById('pop-count');
-    const buildingCountEl = document.getElementById('building-count');
     if (popCountEl) popCountEl.innerText = avatarManager.avatars.length;
     if (buildingCountEl) buildingCountEl.innerText = city.buildingCount;
+
+    if (nextTierEl) {
+        nextTierEl.innerText = `TIER ${gameState.nextTier}`;
+        const colorHex = PALETTE[gameState.nextTier - 1];
+        if (colorHex !== undefined) {
+             nextTierEl.style.color = '#' + colorHex.toString(16).padStart(6, '0');
+        }
+    }
 
     renderer.render(scene, camera);
 }
