@@ -852,62 +852,18 @@ class CityGrid {
         return empties;
     }
 
-    // Flood Fill to find connected buildings of same tier
-    findMergeCluster() {
-        let visited = new Set();
-        let bestCluster = [];
+    // Upgrade a building at x, z
+    upgradeBuilding(x, z) {
+        if (!this.isValid(x, z)) return null;
 
-        for (let x = 0; x < this.size; x++) {
-            for (let z = 0; z < this.size; z++) {
-                if (!this.grid[x][z]) continue;
-
-                let key = `${x},${z}`;
-                if (visited.has(key)) continue;
-
-                let cluster = this.floodFill(x, z, this.grid[x][z].tier, visited);
-
-                // We need at least 3 to merge
-                if (cluster.length >= 3) {
-                    // Prioritize higher tier merges
-                    if (bestCluster.length === 0 || cluster[0].tier > bestCluster[0].tier) {
-                        bestCluster = cluster;
-                    }
-                }
-            }
+        const cell = this.grid[x][z];
+        if (cell && cell.tier > 0 && cell.tier < 10) {
+            cell.tier++;
+            this.score += Math.pow(cell.tier, 2) * 10;
+            return cell.tier;
         }
-        return bestCluster.length > 0 ? bestCluster : null;
+        return null;
     }
-
-    floodFill(x, z, tier, visited) {
-        let cluster = [];
-        let stack = [{ x, z }];
-
-        while (stack.length > 0) {
-            let p = stack.pop();
-            let key = `${p.x},${p.z}`;
-
-            if (!this.isValid(p.x, p.z)) continue;
-            if (visited.has(key)) continue;
-
-            let cell = this.grid[p.x][p.z];
-            if (cell && cell.tier === tier) {
-                visited.add(key);
-                cluster.push(cell); // Push the data object
-                // Add coordinates to data object for reference
-                cell.x = p.x;
-                cell.z = p.z;
-
-                // Check Neighbors
-                stack.push({ x: p.x + 1, z: p.z });
-                stack.push({ x: p.x - 1, z: p.z });
-                stack.push({ x: p.x, z: p.z + 1 });
-                stack.push({ x: p.x, z: p.z - 1 });
-            }
-        }
-        return cluster;
-    }
-
-
 }
 
 // --- 5. EXECUTION & LOOP ---
@@ -1097,39 +1053,33 @@ function spawnVisual(x, z, tier) {
 function gameTick() {
     if (gameState.isBusy || gameState.isGameOver) return;
 
-    // 1. Check for Merges
-    const cluster = city.findMergeCluster();
-    if (cluster) {
-        resolveMerges(cluster[0].x, cluster[0].z);
-    } else {
-        // 2. Spawn Logic
-        const empties = city.getEmpties();
-        if (empties.length === 0) {
-            console.log("Grid Full! Game Over.");
-            triggerGameOver();
-            return;
-        }
-
-        // Clustering Logic: Filter for empties with neighbors
-        const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-        const candidates = empties.filter(pos => {
-            return neighbors.some(([dx, dz]) => {
-                const nx = pos.x + dx;
-                const nz = pos.z + dz;
-                return city.isValid(nx, nz) && city.grid[nx][nz] !== null;
-            });
-        });
-
-        // Pick from candidates if any, otherwise random (first building)
-        const targets = candidates.length > 0 ? candidates : empties;
-        const spot = targets[Math.floor(Math.random() * targets.length)];
-
-        city.place(spot.x, spot.z, 1); // Always spawn Tier 1
-        spawnVisual(spot.x, spot.z, 1);
-
-        // Immediate merge check for the new placement
-        resolveMerges(spot.x, spot.z);
+    // Spawn Logic
+    const empties = city.getEmpties();
+    if (empties.length === 0) {
+        console.log("Grid Full! Game Over.");
+        triggerGameOver();
+        return;
     }
+
+    // Clustering Logic: Filter for empties with neighbors
+    const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    const candidates = empties.filter(pos => {
+        return neighbors.some(([dx, dz]) => {
+            const nx = pos.x + dx;
+            const nz = pos.z + dz;
+            return city.isValid(nx, nz) && city.grid[nx][nz] !== null;
+        });
+    });
+
+    // Pick from candidates if any, otherwise random (first building)
+    const targets = candidates.length > 0 ? candidates : empties;
+    const spot = targets[Math.floor(Math.random() * targets.length)];
+
+    city.place(spot.x, spot.z, 1); // Always spawn Tier 1
+    spawnVisual(spot.x, spot.z, 1);
+
+    // Trigger growth for neighbors
+    triggerGrowth(spot.x, spot.z);
 }
 
 // Start Timer
@@ -1203,8 +1153,8 @@ window.addEventListener('pointerdown', (event) => {
             city.place(gx, gz, gameState.nextTier);
             spawnVisual(gx, gz, gameState.nextTier);
 
-            // Check Merges
-            resolveMerges(gx, gz);
+            // Trigger Growth
+            triggerGrowth(gx, gz);
 
             // Next Turn
             gameState.nextTier = generateNextTier();
@@ -1214,56 +1164,27 @@ window.addEventListener('pointerdown', (event) => {
     }
 });
 
-function resolveMerges(x, z) {
-    if (!city.isValid(x, z) || city.grid[x][z] === null) {
-        gameState.isBusy = false;
-        return;
-    }
+function triggerGrowth(x, z) {
+    if (!city.isValid(x, z)) return;
 
-    const currentTier = city.grid[x][z].tier;
-    if (currentTier === -1) { // Don't merge roads
-        gameState.isBusy = false;
-        return;
-    }
-    const cluster = city.floodFill(x, z, currentTier, new Set());
+    // Check neighbors
+    const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
 
-    if (cluster.length >= 3) {
-        console.log("Merge!", cluster.length, "items of Tier", currentTier);
-        gameState.isBusy = true;
+    neighbors.forEach(([dx, dz]) => {
+        const nx = x + dx;
+        const nz = z + dz;
 
-        // Remove all from data & visual
-        cluster.forEach(b => city.remove(b.x, b.z));
-
-        // Delay spawn of upgrade to let shrink animation play
-        setTimeout(() => {
-            try {
-                const newTier = currentTier + 1;
-                const placed = city.place(x, z, newTier);
-
-                if (!placed) {
-                    console.warn(`Failed to place tier ${newTier} at ${x},${z}`);
-                    gameState.isBusy = false;
-                    return;
-                }
-
-                spawnVisual(x, z, newTier);
-
-                // Particles!
-                if (newTier <= 10) {
-                     const color = PALETTE[newTier - 1];
-                     particleSystem.spawn(x, z, color);
-                }
-
-                // Recursive check
-                resolveMerges(x, z);
-            } catch (e) {
-                console.error("Error in resolveMerges:", e);
-                gameState.isBusy = false;
+        // Upgrade neighbor if it's a building
+        const newTier = city.upgradeBuilding(nx, nz);
+        if (newTier) {
+            spawnVisual(nx, nz, newTier);
+            // Particles
+            const color = PALETTE[newTier - 1];
+            if (color) {
+                 particleSystem.spawn(nx, nz, color);
             }
-        }, 150);
-    } else {
-        gameState.isBusy = false;
-    }
+        }
+    });
 }
 
 // --- 5.1 AVATAR SYSTEM ---
