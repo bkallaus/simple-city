@@ -1443,10 +1443,6 @@ function animate() {
     cloudSystem.update(dt);
 
     // Update UI
-    const popCountEl = document.getElementById('pop-count');
-    const buildingCountEl = document.getElementById('building-count');
-    if (popCountEl) popCountEl.innerText = avatarManager.avatars.length;
-    if (buildingCountEl) buildingCountEl.innerText = city.buildingCount;
 
     renderer.render(scene, camera);
 }
