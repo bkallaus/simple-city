@@ -41,6 +41,7 @@ controls.mouseButtons = {
 };
 controls.minZoom = 0.5;
 controls.maxZoom = 2;
+controls.enableZoom = false; // Disable zoom to allow page scrolling
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
