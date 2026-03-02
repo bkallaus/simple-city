@@ -29,6 +29,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Enable Shadows
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
+renderer.domElement.setAttribute("aria-label", "Pop City Game Board");
+renderer.domElement.setAttribute("role", "application");
 
 // --- CONTROLS ---
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -1099,6 +1101,17 @@ const cursor = new THREE.Mesh(cursorGeo, cursorMat);
 scene.add(cursor);
 cursor.visible = false; // Initially hidden
 
+function updateUX() {
+    const hex = PALETTE[gameState.nextTier - 1] || 0xffffff;
+    cursorMat.color.setHex(hex);
+    const uiEl = document.getElementById("next-tier");
+    if (uiEl) {
+        uiEl.textContent = gameState.nextTier;
+        uiEl.style.color = "#" + hex.toString(16).padStart(6, "0");
+    }
+}
+updateUX();
+
 // Event Listeners
 window.addEventListener('mousemove', (event) => {
     // Normalize mouse position
@@ -1159,6 +1172,7 @@ window.addEventListener('pointerdown', (event) => {
 
             // Next Turn
             gameState.nextTier = generateNextTier();
+            updateUX();
 
             console.log("Next Tier:", gameState.nextTier);
         }
@@ -1423,6 +1437,7 @@ function resetGame() {
     gameState.isGameOver = false;
     gameState.isBusy = false;
     gameState.nextTier = 1; // Reset next tier
+    updateUX();
 
     console.log("Game Reset Complete");
 }

@@ -1,0 +1,3 @@
+## 2024-05-20 - Adding UI Feedback and ARIA to Canvas
+**Learning:** Three.js canvases are entirely opaque to screen readers by default. Adding `role="application"` and an `aria-label` is a low-effort, high-impact way to at least identify the interactive area. Furthermore, providing explicit visual feedback (like next-tier color and text) drastically reduces cognitive load in complex state-driven games.
+**Action:** Always ensure that dynamically generated `<canvas>` elements have appropriate ARIA roles and labels, and ensure any internal game state that dictates user interaction is visually represented in the UI.
