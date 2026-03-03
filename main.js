@@ -28,6 +28,12 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Enable Shadows
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// Accessibility
+renderer.domElement.setAttribute('role', 'application');
+renderer.domElement.setAttribute('aria-label', 'Pop City Game Board');
+renderer.domElement.tabIndex = 0;
+
 document.body.appendChild(renderer.domElement);
 
 // --- CONTROLS ---
@@ -1122,11 +1128,21 @@ window.addEventListener('mousemove', (event) => {
             const worldPos = gridToWorld(gx, gz);
             cursor.position.set(worldPos.x, 0.1, worldPos.z);
             cursor.visible = true;
+
+            // Cursor state UX feedback
+            const cell = city.grid[gx][gz];
+            if (cell === null || cell.tier === -1) {
+                document.body.style.cursor = 'pointer'; // Valid placement spot
+            } else {
+                document.body.style.cursor = 'not-allowed'; // Invalid placement spot (obstacle or existing building)
+            }
         } else {
             cursor.visible = false;
+            document.body.style.cursor = 'default';
         }
     } else {
         cursor.visible = false;
+        document.body.style.cursor = 'default';
     }
 });
 
