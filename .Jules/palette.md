@@ -1,0 +1,3 @@
+## 2024-05-24 - Canvas Interactivity State Communication
+**Learning:** WebGL custom canvas games often lack built-in browser UI feedback. Without explicit cursor state changes (like switching to `not-allowed` over obstacles or `pointer` over actionable areas), users have no affordance for valid click targets and may repeatedly click dead zones out of frustration.
+**Action:** Always implement explicit CSS cursor states in global mouse event listeners corresponding to underlying game logic states when working on custom canvas renderers.
