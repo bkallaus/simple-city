@@ -1,0 +1,3 @@
+## 2024-05-24 - Screen Reader Support for Canvas Game HUD
+**Learning:** When building WebGL/Canvas games, HUDs are often rendered directly inside the canvas, making them completely opaque to screen readers. If critical game state (like the upcoming piece/tier) is displayed in DOM overlays, it must proactively announce changes.
+**Action:** Use `aria-live="polite"` and `aria-atomic="true"` on the DOM container that holds dynamic HUD text so that state changes (e.g., the next item to place) are read aloud without interrupting the user's flow.
