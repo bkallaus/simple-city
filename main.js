@@ -915,6 +915,10 @@ function generateNextTier() {
 
 // Initial Generation
 gameState.nextTier = generateNextTier();
+// Wait for DOM to load before first update
+window.addEventListener('DOMContentLoaded', () => {
+    if (typeof updateUX === 'function') updateUX();
+});
 
 // Helper: Convert Grid Index to World Position
 function gridToWorld(x, z) {
@@ -1101,9 +1105,26 @@ const mouse = new THREE.Vector2();
 // Cursor Visual
 const cursorGeo = new THREE.BoxGeometry(CONFIG.tileSize, 0.2, CONFIG.tileSize);
 const cursorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, opacity: 0.5, transparent: true });
+window.cursorMat = cursorMat; // Expose globally for UX updates
 const cursor = new THREE.Mesh(cursorGeo, cursorMat);
 scene.add(cursor);
 cursor.visible = false; // Initially hidden
+
+// Accessibility / UX update function
+function updateUX() {
+    const nextEl = document.getElementById('next-tier');
+    if (nextEl) {
+        nextEl.innerText = `Next: Tier ${gameState.nextTier}`;
+        const colorHex = PALETTE[gameState.nextTier - 1];
+        if (colorHex !== undefined) {
+            const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+            nextEl.style.color = colorStr;
+            if (window.cursorMat) {
+                window.cursorMat.color.setHex(colorHex);
+            }
+        }
+    }
+}
 
 // Event Listeners
 window.addEventListener('mousemove', (event) => {
@@ -1175,6 +1196,7 @@ window.addEventListener('pointerdown', (event) => {
 
             // Next Turn
             gameState.nextTier = generateNextTier();
+            if (typeof updateUX === 'function') updateUX();
 
             console.log("Next Tier:", gameState.nextTier);
         }
@@ -1439,6 +1461,7 @@ function resetGame() {
     gameState.isGameOver = false;
     gameState.isBusy = false;
     gameState.nextTier = 1; // Reset next tier
+    if (typeof updateUX === 'function') updateUX();
 
     console.log("Game Reset Complete");
 }
