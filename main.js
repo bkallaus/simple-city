@@ -1101,6 +1101,7 @@ const mouse = new THREE.Vector2();
 // Cursor Visual
 const cursorGeo = new THREE.BoxGeometry(CONFIG.tileSize, 0.2, CONFIG.tileSize);
 const cursorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, opacity: 0.5, transparent: true });
+window.cursorMat = cursorMat;
 const cursor = new THREE.Mesh(cursorGeo, cursorMat);
 scene.add(cursor);
 cursor.visible = false; // Initially hidden
@@ -1460,10 +1461,31 @@ function animate() {
     cloudSystem.update(dt);
 
     // Update UI
+    updateUX();
 
     renderer.render(scene, camera);
 }
 animate();
+
+// UX Sync Function
+function updateUX() {
+    const nextTierSpan = document.getElementById('next-tier');
+    if (nextTierSpan && gameState) {
+        const colorHex = PALETTE[gameState.nextTier - 1];
+        const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+
+        // Only update if it changed to avoid noisy DOM writes
+        const newText = `Next: Tier ${gameState.nextTier}`;
+        if (nextTierSpan.innerText !== newText) {
+            nextTierSpan.innerText = newText;
+            nextTierSpan.style.color = colorStr;
+        }
+
+        if (window.cursorMat) {
+            window.cursorMat.color.setHex(colorHex);
+        }
+    }
+}
 
 // Handle Window Resize
 window.addEventListener('resize', () => {

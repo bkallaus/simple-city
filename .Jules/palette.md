@@ -1,0 +1,3 @@
+## 2024-05-24 - Canvas/WebGL Game State Accessibility
+**Learning:** In canvas/WebGL games, critical game state updates (like an upcoming building tier) are completely invisible to screen readers since they exist only in the render context.
+**Action:** Always project critical state changes into a DOM overlay using `aria-live="polite"` and `aria-atomic="true"` to ensure screen readers announce changes dynamically without interrupting the user's flow.
