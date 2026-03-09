@@ -1,0 +1,3 @@
+## 2024-03-09 - Accessible State Announcements in WebGL/Canvas
+**Learning:** In canvas-based games where game state is predominantly visual (like upcoming placement tiers), screen reader users are entirely left out. Standard Three.js/WebGL applications lack native semantics for upcoming interactive states. Exposing internal states (like `nextTier`) to a DOM overlay with `aria-live="polite"` creates a lightweight, reusable pattern for WebGL accessibility without interrupting gameplay flow.
+**Action:** Use visually-synchronized ARIA live regions for critical game states that cannot be natively exposed through the WebGL canvas, and ensure colors mapped in 3D (like the placement cursor) are also reflected in the HTML HUD for cognitive reinforcement.
