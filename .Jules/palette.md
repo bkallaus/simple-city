@@ -1,0 +1,3 @@
+## 2024-05-24 - Accessible HUD Overlays in WebGL Canvas Games
+**Learning:** Because WebGL (Canvas) elements themselves are opaque to screen readers, any critical dynamic game state (like current turn, next piece, scores) must be projected into a visually overlapping DOM layer. When this dynamic data changes automatically or as a result of interaction, adding `aria-live="polite"` and `aria-atomic="true"` to the specific DOM element ensures that screen readers dynamically announce the update without breaking the user's flow.
+**Action:** When designing UI layers over Canvas/WebGL games, explicitly mirror crucial internal state to accessible DOM nodes using aria-live regions so that assistive technologies can track game progression smoothly.
