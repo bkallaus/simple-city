@@ -915,6 +915,7 @@ function generateNextTier() {
 
 // Initial Generation
 gameState.nextTier = generateNextTier();
+updateUX();
 
 // Helper: Convert Grid Index to World Position
 function gridToWorld(x, z) {
@@ -1101,7 +1102,26 @@ const mouse = new THREE.Vector2();
 // Cursor Visual
 const cursorGeo = new THREE.BoxGeometry(CONFIG.tileSize, 0.2, CONFIG.tileSize);
 const cursorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, opacity: 0.5, transparent: true });
+window.cursorMat = cursorMat;
 const cursor = new THREE.Mesh(cursorGeo, cursorMat);
+
+// UX Updates
+function updateUX() {
+    const colorHex = PALETTE[gameState.nextTier - 1];
+    const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+
+    // Update cursor color
+    if (window.cursorMat) {
+        window.cursorMat.color.setHex(colorHex);
+    }
+
+    // Update DOM UI
+    const nextTierEl = document.getElementById('next-tier');
+    if (nextTierEl) {
+        nextTierEl.textContent = `Next: Tier ${gameState.nextTier}`;
+        nextTierEl.style.color = colorStr;
+    }
+}
 scene.add(cursor);
 cursor.visible = false; // Initially hidden
 
@@ -1175,6 +1195,7 @@ window.addEventListener('pointerdown', (event) => {
 
             // Next Turn
             gameState.nextTier = generateNextTier();
+            updateUX();
 
             console.log("Next Tier:", gameState.nextTier);
         }
@@ -1439,6 +1460,7 @@ function resetGame() {
     gameState.isGameOver = false;
     gameState.isBusy = false;
     gameState.nextTier = 1; // Reset next tier
+    updateUX();
 
     console.log("Game Reset Complete");
 }
