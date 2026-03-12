@@ -913,8 +913,26 @@ function generateNextTier() {
     return Math.random() < 0.7 ? 1 : 2;
 }
 
+function updateUX() {
+    const colorHex = PALETTE[gameState.nextTier - 1];
+    const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+
+    // Update UI
+    const uiEl = document.getElementById('next-tier');
+    if (uiEl) {
+        uiEl.textContent = `Next: Tier ${gameState.nextTier}`;
+        uiEl.style.color = colorStr;
+    }
+
+    // Update Cursor
+    if (window.cursorMat) {
+        window.cursorMat.color.setHex(colorHex);
+    }
+}
+
 // Initial Generation
 gameState.nextTier = generateNextTier();
+updateUX();
 
 // Helper: Convert Grid Index to World Position
 function gridToWorld(x, z) {
@@ -1100,8 +1118,8 @@ const mouse = new THREE.Vector2();
 
 // Cursor Visual
 const cursorGeo = new THREE.BoxGeometry(CONFIG.tileSize, 0.2, CONFIG.tileSize);
-const cursorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, opacity: 0.5, transparent: true });
-const cursor = new THREE.Mesh(cursorGeo, cursorMat);
+window.cursorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, opacity: 0.5, transparent: true });
+const cursor = new THREE.Mesh(cursorGeo, window.cursorMat);
 scene.add(cursor);
 cursor.visible = false; // Initially hidden
 
@@ -1146,6 +1164,9 @@ window.addEventListener('mousemove', (event) => {
     }
 });
 
+// Update UX initially now that cursor is created
+updateUX();
+
 // Click Listener
 window.addEventListener('pointerdown', (event) => {
     if (gameState.isGameOver || gameState.isBusy) return;
@@ -1175,6 +1196,7 @@ window.addEventListener('pointerdown', (event) => {
 
             // Next Turn
             gameState.nextTier = generateNextTier();
+            updateUX();
 
             console.log("Next Tier:", gameState.nextTier);
         }
@@ -1439,6 +1461,7 @@ function resetGame() {
     gameState.isGameOver = false;
     gameState.isBusy = false;
     gameState.nextTier = 1; // Reset next tier
+    updateUX();
 
     console.log("Game Reset Complete");
 }
