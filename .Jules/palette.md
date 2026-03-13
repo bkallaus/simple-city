@@ -1,0 +1,3 @@
+## 2024-05-15 - [Screen Reader Support for WebGL/Canvas Games]
+**Learning:** In WebGL/Canvas games where visual state changes rapidly (like next available building tier), critical state updates must be synchronized with a DOM overlay using `aria-live="polite"` and `aria-atomic="true"`. This ensures screen readers can dynamically announce important game updates without completely breaking user immersion or requiring constant tabbing.
+**Action:** Always maintain a hidden or subtle DOM overlay synchronized with critical visual game state for screen reader accessibility in Canvas/WebGL projects.
