@@ -1,0 +1,3 @@
+## 2024-05-24 - [Canvas Game Accessibility]
+**Learning:** Canvas-based games hide critical game state changes (like "next building tier" or "current turn") from screen readers because all rendering happens inside an opaque `<canvas>` element. Standard ARIA attributes on the canvas itself are insufficient for dynamic updates.
+**Action:** When working on Canvas/WebGL interfaces, identify critical state variables displayed visually (e.g., upcoming items, scores, warnings) and mirror them to hidden or overlaid DOM elements using `aria-live="polite"` and `aria-atomic="true"`. This ensures screen readers announce these changes dynamically without interrupting the user's flow.
