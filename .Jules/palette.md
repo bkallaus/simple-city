@@ -1,0 +1,3 @@
+## 2024-05-14 - Exposing Canvas Game State with aria-live
+**Learning:** In WebGL/Canvas games, critical game state updates displayed in DOM overlays (like the upcoming building tier) should use `aria-live="polite"` and `aria-atomic="true"`. This ensures screen readers announce changes dynamically without interrupting the user's flow, significantly improving the accessibility of highly visual games.
+**Action:** Always consider what visual information in a canvas is critical for gameplay, and expose that state through an accessible DOM layer with appropriate ARIA attributes.
