@@ -1,0 +1,3 @@
+## 2024-05-15 - [Screen Reader Support for Canvas Elements]
+**Learning:** Pairing pure Canvas visual elements (like a 3D building placement cursor) with a hidden or visually integrated ARIA-live DOM element significantly boosts accessibility. This ensures screen readers can announce dynamic state changes (like the upcoming tier color) without interrupting the flow or requiring users to rely purely on visual canvas updates.
+**Action:** Always provide parallel DOM-based textual representations with appropriate `aria-live` attributes when critical UI state is conveyed solely through canvas textures, colors, or 3D cursor changes.
