@@ -1101,9 +1101,24 @@ const mouse = new THREE.Vector2();
 // Cursor Visual
 const cursorGeo = new THREE.BoxGeometry(CONFIG.tileSize, 0.2, CONFIG.tileSize);
 const cursorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, opacity: 0.5, transparent: true });
+window.cursorMat = cursorMat; // Make accessible globally for UX syncing
 const cursor = new THREE.Mesh(cursorGeo, cursorMat);
 scene.add(cursor);
 cursor.visible = false; // Initially hidden
+
+// Sync UI and cursor color
+function updateUX() {
+    const nextTierSpan = document.getElementById('next-tier');
+    if (nextTierSpan && window.cursorMat) {
+        const tier = gameState.nextTier;
+        nextTierSpan.innerText = `Tier ${tier}`;
+        const colorHex = PALETTE[tier - 1] || 0xffffff;
+        const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+        nextTierSpan.style.color = colorStr;
+        window.cursorMat.color.setHex(colorHex);
+    }
+}
+updateUX();
 
 // Event Listeners
 window.addEventListener('mousemove', (event) => {
@@ -1175,6 +1190,7 @@ window.addEventListener('pointerdown', (event) => {
 
             // Next Turn
             gameState.nextTier = generateNextTier();
+            updateUX();
 
             console.log("Next Tier:", gameState.nextTier);
         }
@@ -1439,6 +1455,7 @@ function resetGame() {
     gameState.isGameOver = false;
     gameState.isBusy = false;
     gameState.nextTier = 1; // Reset next tier
+    updateUX();
 
     console.log("Game Reset Complete");
 }

@@ -1,0 +1,3 @@
+## 2024-05-14 - Canvas Game Accessibility Syncing
+**Learning:** When using `<canvas>` for rendering games or highly interactive UI states (like a dynamic 3D cursor representing the next item to place), visually updating the WebGL state alone leaves screen-reader users completely unaware of critical game state changes.
+**Action:** Pair WebGL visual changes (like cursor color or mesh updates) with a multi-modal DOM feedback layer. Using a visually present or hidden span with `aria-live="polite"` and `aria-atomic="true"` ensures that whenever the internal game state updates (e.g., `gameState.nextTier`), the DOM and Canvas stay perfectly synchronized and accessible to all users.
