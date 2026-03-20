@@ -1105,6 +1105,21 @@ const cursor = new THREE.Mesh(cursorGeo, cursorMat);
 scene.add(cursor);
 cursor.visible = false; // Initially hidden
 
+function updateUX() {
+    const nextTierEl = document.getElementById('next-tier');
+    if (nextTierEl) {
+        nextTierEl.innerText = `Next: Tier ${gameState.nextTier}`;
+        const colorHex = PALETTE[gameState.nextTier - 1];
+        if (colorHex !== undefined) {
+            const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+            nextTierEl.style.color = colorStr;
+            cursorMat.color.setHex(colorHex);
+        }
+    }
+}
+
+updateUX();
+
 // Event Listeners
 window.addEventListener('mousemove', (event) => {
     // Normalize mouse position
@@ -1175,6 +1190,7 @@ window.addEventListener('pointerdown', (event) => {
 
             // Next Turn
             gameState.nextTier = generateNextTier();
+            updateUX();
 
             console.log("Next Tier:", gameState.nextTier);
         }
@@ -1439,6 +1455,7 @@ function resetGame() {
     gameState.isGameOver = false;
     gameState.isBusy = false;
     gameState.nextTier = 1; // Reset next tier
+    updateUX();
 
     console.log("Game Reset Complete");
 }
