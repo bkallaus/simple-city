@@ -1,0 +1,15 @@
+- PR Title: feat: Update UI to display Score, Population, and Next Tier
+- The Problem Solved: Integrates dynamic state updates (Score, Population, Next Tier) into the `#ui` overlay in `main.js` to match the visual layout shown in `GOAL.png`.
+- Visuals: Verified via Playwright screenshot.
+- Implementation Journey:
+  - Identified target variables: `city.score`, `city.buildingCount`, `gameState.nextTier`.
+  - Found injection point at line 1462 (`// Update UI`) in `main.js`.
+  - Injected UI update inside `animate()` loop using a global reference to the DOM element (`uiElement = document.getElementById('ui')`).
+  - Optimized the update by only changing `.innerHTML` if the generated string differs from the current inner HTML (preventing redundant DOM repaints at 60fps).
+- Tradeoffs & Assumptions:
+  - Path 1: Update in separate functions called when variables change (Standard).
+  - Path 2: Direct `.innerHTML` replacement inside `animate()` loop without caching (Minimalist, initially proposed).
+  - Path 3: Create separate DOM elements for each stat and only update their text nodes.
+  - Selected Path: A refined Minimalist approach. Direct `.innerHTML` update inside the `animate()` loop using template literals, but with a caching check and global element reference to avoid performance degradation.
+- Testing Instructions: Open `index.html` in a browser. The top-left corner should display Score, Population, and Next Tier, updating dynamically as gameplay progresses.
+- Action Item: `git push -u origin feature/ui-update-score-population && gh pr create --title "feat: Update UI to display Score, Population, and Next Tier" --body-file manifest.md`
