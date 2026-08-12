@@ -871,6 +871,7 @@ class CityGrid {
 
 // Init Game State
 const city = new CityGrid(CONFIG.gridSize);
+const uiElement = document.getElementById('ui');
 
 // Initial Obstacles
 function spawnObstacles() {
@@ -1454,6 +1455,10 @@ function animate() {
     cloudSystem.update(dt);
 
     // Update UI
+    const uiString = `Score: ${city.score}<br>Population: ${city.buildingCount}<br><div id="next-tier">Next Tier: ${gameState.nextTier}</div>`;
+    if (uiElement && uiElement.innerHTML !== uiString) {
+        uiElement.innerHTML = uiString;
+    }
 
     renderer.render(scene, camera);
 }
