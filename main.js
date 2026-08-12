@@ -373,28 +373,22 @@ function createBuildingMesh(tier) {
     }
 
     if (t === -2) {
-        // Nature Obstacle (Tree)
+        // Nature Obstacle (Rock)
         const group = new THREE.Group();
 
-        // Tree Geometry & Material (Recreated here for grid placement)
-        // Ideally we'd cache these geometries in ASSETS but for now it's okay
-        const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.4, 6);
-        const leavesGeo = new THREE.ConeGeometry(0.5, 1.2, 8);
+        // Rock Geometry & Material (matching generateEnvironment logic)
+        const rockGeo = new THREE.DodecahedronGeometry(0.5);
+        const rockMat = getMaterial('standard', { color: 0x888888, roughness: 0.6, flatShading: true });
 
-        const trunkMat = getMaterial('standard', { color: 0x5d4037, roughness: 0.9, flatShading: true });
-        const leavesMat = getMaterial('standard', { color: 0x2d6a4f, roughness: 0.8, flatShading: true });
+        const rock = new THREE.Mesh(rockGeo, rockMat);
+        rock.castShadow = true;
+        rock.receiveShadow = true;
+        rock.position.y = 0.25; // slightly above ground
 
-        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = 0.2;
-        trunk.castShadow = true;
-        trunk.receiveShadow = true;
+        // Random scale variation
+        rock.scale.set(1 + Math.random(), 0.5 + Math.random()*0.5, 1 + Math.random());
 
-        const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-        leaves.position.y = 0.8;
-        leaves.castShadow = true;
-        leaves.receiveShadow = true;
-
-        group.add(trunk, leaves);
+        group.add(rock);
 
         // Random slight rotation/scale for variety
         group.rotation.y = Math.random() * Math.PI * 2;
