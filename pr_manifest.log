@@ -1,15 +1,25 @@
+PR Title: feat: Match-3 Cluster Logic
 
-- PR Title: feat: Update grid obstacles to low-poly rocks
-- The Problem Solved: Replaced the visual representation of grid obstacles (`tier: -2`) from high-poly trees to low-poly rocks, matching `GOAL.png` and unifying the aesthetic with existing environment decorations.
-- Visuals: Visual verification stored locally in `verification_obstacles.png`. Demonstrates exact parity with target visual state.
-- Implementation Journey:
-  - Investigated `main.js` to trace generation of grid objects for `tier: -2`.
-  - Identified target geometry (`THREE.DodecahedronGeometry(0.5)`) and material (`0x888888`) logic previously defined in `generateEnvironment()`.
-  - Surgically replaced tree generation block inside `createBuildingMesh()` to spawn the defined rocks.
-  - Executed Playwright script to output visual verification and guarantee parity.
-- Tradeoffs & Assumptions:
-  1. Standard Path: Add logic directly replacing visual meshes without refactoring core rendering flow (Chosen approach - highest impact, minimal lines).
-  2. Minimalist Path: Keep trees but change their color (Rejected, visual mismatch with GOAL.png).
-  3. Lateral/Creative Path: Export the geometries as pre-built GLTF assets to load dynamically. (Rejected, increases complexity and breaks the procedural/no-build zero-dependency rule).
-- Testing Instructions: Open `index.html` in a modern browser and observe the grid during initialization. The obstacles generated on the grid should appear as random gray low-poly rocks instead of trees.
-- Action Item: `Submit tool executed`
+The Problem Solved: The game indiscriminately upgraded neighboring buildings (via `triggerGrowth`) instead of requiring 3+ identical buildings to merge. This implements a proper BFS flood-fill algorithm (`resolveMerges`) with visual convergence animations that aligns the core game loop with true Match-3 mechanics as depicted conceptually by game intent.
+
+Visuals:
+- Screenshot comparison available in `verification_match3_after.png` showing the successful merging of 3 Tier 1 buildings into a Tier 2 building.
+
+Implementation Journey:
+- Replaced `triggerGrowth` with `resolveMerges`.
+- Implemented BFS flood-fill to detect clusters of adjacent, identical-tier buildings.
+- Grouped clusters >= 3 into asynchronous GSAP animations that pull into a focal point.
+- Upgraded the focal point to tier+1 and cleaned up the other grid cells.
+- Hooked `resolveMerges` into `gameTick` and the pointerdown listener.
+
+Tradeoffs & Assumptions:
+- Path 2 was chosen: Animated Async Cluster Resolution.
+- Assumption: The UI and grid updates should wait (`gameState.isBusy`) until the visual convergence (GSAP animation) is complete to prevent desyncs during rapid user clicks.
+- I chose not to introduce external queue management, using the simple async `onComplete` counters inside `resolveMerges` as a minimalist approach suited for a vanilla JS environment without build steps.
+
+Testing Instructions:
+1. Open `index.html` in a browser.
+2. Place 3 red Tier 1 buildings next to each other.
+3. Observe them pull into the last clicked tile and transform into a teal Tier 2 building.
+
+Action Item: gh pr create --title "feat: Match-3 Cluster Logic" --body-file pr_manifest.log --base main

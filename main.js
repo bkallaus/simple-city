@@ -1079,8 +1079,8 @@ function gameTick() {
     city.place(spot.x, spot.z, 1); // Always spawn Tier 1
     spawnVisual(spot.x, spot.z, 1);
 
-    // Trigger growth for neighbors
-    triggerGrowth(spot.x, spot.z);
+    // Resolve merges
+    resolveMerges(spot.x, spot.z);
 }
 
 // Start Timer
@@ -1164,8 +1164,8 @@ window.addEventListener('pointerdown', (event) => {
             city.place(gx, gz, gameState.nextTier);
             spawnVisual(gx, gz, gameState.nextTier);
 
-            // Trigger Growth
-            triggerGrowth(gx, gz);
+            // Resolve Merges
+            resolveMerges(gx, gz);
 
             // Next Turn
             gameState.nextTier = generateNextTier();
@@ -1175,27 +1175,82 @@ window.addEventListener('pointerdown', (event) => {
     }
 });
 
-function triggerGrowth(x, z) {
-    if (!city.isValid(x, z)) return;
+function resolveMerges(x, z) {
+    if (!city.isValid(x, z) || city.grid[x][z] === null) return;
 
-    // Check neighbors
-    const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    const targetTier = city.grid[x][z].tier;
+    if (targetTier <= 0 || targetTier >= 10) return;
 
-    neighbors.forEach(([dx, dz]) => {
-        const nx = x + dx;
-        const nz = z + dz;
+    const cluster = [];
+    const visited = new Set();
+    const queue = [{ x, z }];
 
-        // Upgrade neighbor if it's a building
-        const newTier = city.upgradeBuilding(nx, nz);
-        if (newTier) {
-            spawnVisual(nx, nz, newTier);
-            // Particles
-            const color = PALETTE[newTier - 1];
-            if (color) {
-                 particleSystem.spawn(nx, nz, color);
+    visited.add(`${x},${z}`);
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+        cluster.push(current);
+
+        const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+        neighbors.forEach(([dx, dz]) => {
+            const nx = current.x + dx;
+            const nz = current.z + dz;
+            const key = `${nx},${nz}`;
+
+            if (city.isValid(nx, nz) && !visited.has(key)) {
+                const cell = city.grid[nx][nz];
+                if (cell && cell.tier === targetTier) {
+                    visited.add(key);
+                    queue.push({ x: nx, z: nz });
+                }
             }
-        }
-    });
+        });
+    }
+
+    if (cluster.length >= 3) {
+        gameState.isBusy = true;
+        const focalPos = gridToWorld(x, z);
+
+        let animationsComplete = 0;
+        const totalAnimations = cluster.length - 1;
+
+        const onComplete = () => {
+            animationsComplete++;
+            if (animationsComplete >= totalAnimations) {
+                const newTier = city.upgradeBuilding(x, z);
+                if (newTier) {
+                    spawnVisual(x, z, newTier);
+                    const color = PALETTE[newTier - 1];
+                    if (color) {
+                         particleSystem.spawn(x, z, color, 32);
+                    }
+                }
+                gameState.isBusy = false;
+                resolveMerges(x, z);
+            }
+        };
+
+        cluster.forEach((cell) => {
+            if (cell.x === x && cell.z === z) return;
+
+            const mesh = city.meshGrid[cell.x][cell.z];
+            if (mesh) {
+                gsap.to(mesh.position, {
+                    x: focalPos.x,
+                    z: focalPos.z,
+                    duration: 0.5,
+                    ease: "power2.in",
+                    onComplete: () => {
+                        city.remove(cell.x, cell.z);
+                        onComplete();
+                    }
+                });
+            } else {
+                city.remove(cell.x, cell.z);
+                onComplete();
+            }
+        });
+    }
 }
 
 // --- 5.1 AVATAR SYSTEM ---
