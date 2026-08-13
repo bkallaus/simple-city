@@ -893,7 +893,7 @@ function spawnObstacles() {
         }
     }
 }
-spawnObstacles();
+// spawnObstacles(); // Disabled per requirements
 
 // New Game State Logic
 const gameState = {
