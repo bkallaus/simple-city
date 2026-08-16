@@ -1454,6 +1454,11 @@ function animate() {
     cloudSystem.update(dt);
 
     // Update UI
+    const nextTierUI = document.getElementById('next-tier');
+    if (nextTierUI && nextTierUI.dataset.tier !== String(gameState.nextTier)) {
+        nextTierUI.innerText = `Next: Tier ${gameState.nextTier}`;
+        nextTierUI.dataset.tier = String(gameState.nextTier);
+    }
 
     renderer.render(scene, camera);
 }
