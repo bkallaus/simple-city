@@ -335,13 +335,16 @@ function getMaterial(type, params) {
 
 // The Procedural Building Generator
 function createBuildingMesh(tier) {
-    // Clamp tier to 1-10
-    const t = Math.min(Math.max(tier, 1), 10);
+    // Clamp positive tiers to 1-10, keep negative tiers intact
+    const t = tier > 0 ? Math.min(Math.max(tier, 1), 10) : tier;
 
     // Generate or Fetch Texture
     if (!ASSETS.textures[t]) {
-        const colorHex = PALETTE[t - 1];
-        const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+        let colorStr = '#ffffff';
+        if (t > 0) {
+            const colorHex = PALETTE[t - 1];
+            colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+        }
 
         if (t === -1) {
             ASSETS.textures[t] = TextureFactory.road();
@@ -1084,7 +1087,7 @@ function gameTick() {
 }
 
 // Start Timer
-setInterval(gameTick, CONFIG.tickRate);
+window.gameInterval = setInterval(gameTick, CONFIG.tickRate);
 
 // --- 6. INTERACTION ---
 

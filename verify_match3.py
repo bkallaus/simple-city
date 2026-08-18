@@ -18,7 +18,7 @@ def run():
         # but let's just click in the center to place buildings
         page.evaluate("""
             window.testPlace = function(x, z, tier) {
-                if (city.isValid(x, z)) {
+                if (city.isValid(x, z) && (city.grid[x][z] === null || city.grid[x][z].tier === -1)) {
                     city.place(x, z, tier);
                     spawnVisual(x, z, tier);
                 }
@@ -26,7 +26,7 @@ def run():
         """)
 
         # Stop automatic game ticks
-        page.evaluate("clearInterval(1);") # The interval might be 1, let's just use a more robust way
+        page.evaluate("clearInterval(window.gameInterval);")
 
         # Test: Place 3 buildings of tier 1 next to each other
         page.evaluate("testPlace(4, 4, 1);")
