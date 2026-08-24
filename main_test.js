@@ -729,7 +729,7 @@ class CloudSystem {
             if (cloud.position.x > this.bounds) {
                 cloud.position.x = -this.bounds;
                 cloud.position.z = (Math.random() - 0.5) * 40;
-                cloud.position.y = 8 + Math.random() * 5;
+                cloud.position.y = 0.5 + Math.random() * 1.5;
                 cloud.userData.speed = 1.0 + Math.random() * 1.0;
             }
         });
@@ -804,7 +804,7 @@ class CityGrid {
             this.meshGrid[x][z] = null;
         }
 
-        // After removing a building, we might need to update roads? 
+        // After removing a building, we might need to update roads?
         // Or maybe just leave them until something overwrites them?
         // Let's leave them for now, it's simpler.
     }
@@ -1084,7 +1084,7 @@ function gameTick() {
 }
 
 // Start Timer
-setInterval(gameTick, CONFIG.tickRate);
+// setInterval(gameTick, CONFIG.tickRate);
 
 // --- 6. INTERACTION ---
 
@@ -1266,7 +1266,7 @@ class Avatar {
 
         // Reuse cone geometry
         // ConeGeometry(0.1, 0.3, 8)
-        // Shared cone is (0.6, 0.4, 4). 
+        // Shared cone is (0.6, 0.4, 4).
         // Let's create a specific avatar cone or scale the shared one?
         // Scaling smooth cone (8 segments) from low poly (4 segments) looks bad.
         // Let's add a specific avatar geometry to assets if not present, or just make one here for sharing.
@@ -1301,7 +1301,7 @@ class Avatar {
                 this.isMoving = false;
                 this.gx = this.targetGx;
                 this.gz = this.targetGz;
-                // Decide next move immediately or wait? 
+                // Decide next move immediately or wait?
                 // Let's decide next frame implicitly by being not moving
             } else {
                 // Move towards
@@ -1348,8 +1348,8 @@ class Avatar {
             // Face direction
             this.mesh.lookAt(this.target);
             // Rotate X to stand up (Cone geometry is weird, points up Y)
-            // Actually lookAt points Z axis. Cone points up Y. 
-            // We need to rotate geometry or mesh to align. 
+            // Actually lookAt points Z axis. Cone points up Y.
+            // We need to rotate geometry or mesh to align.
             // Simple approach: Just bob up and down
         }
     }

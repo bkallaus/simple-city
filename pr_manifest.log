@@ -1,25 +1,23 @@
-PR Title: feat: Match-3 Cluster Logic
+# Nova PR Manifest
 
-The Problem Solved: The game indiscriminately upgraded neighboring buildings (via `triggerGrowth`) instead of requiring 3+ identical buildings to merge. This implements a proper BFS flood-fill algorithm (`resolveMerges`) with visual convergence animations that aligns the core game loop with true Match-3 mechanics as depicted conceptually by game intent.
-
-Visuals:
-- Screenshot comparison available in `verification_match3_after.png` showing the successful merging of 3 Tier 1 buildings into a Tier 2 building.
-
-Implementation Journey:
-- Replaced `triggerGrowth` with `resolveMerges`.
-- Implemented BFS flood-fill to detect clusters of adjacent, identical-tier buildings.
-- Grouped clusters >= 3 into asynchronous GSAP animations that pull into a focal point.
-- Upgraded the focal point to tier+1 and cleaned up the other grid cells.
-- Hooked `resolveMerges` into `gameTick` and the pointerdown listener.
-
-Tradeoffs & Assumptions:
-- Path 2 was chosen: Animated Async Cluster Resolution.
-- Assumption: The UI and grid updates should wait (`gameState.isBusy`) until the visual convergence (GSAP animation) is complete to prevent desyncs during rapid user clicks.
-- I chose not to introduce external queue management, using the simple async `onComplete` counters inside `resolveMerges` as a minimalist approach suited for a vanilla JS environment without build steps.
-
-Testing Instructions:
-1. Open `index.html` in a browser.
-2. Place 3 red Tier 1 buildings next to each other.
-3. Observe them pull into the last clicked tile and transform into a teal Tier 2 building.
-
-Action Item: gh pr create --title "feat: Match-3 Cluster Logic" --body-file pr_manifest.log --base main
+- **PR Title:** feat: Add Ground Fog (CloudSystem Altitude Adjustment)
+- **The Problem Solved:** The environment originally had high-altitude clouds floating far above the play grid, creating a visual discrepancy from `GOAL.png` which features low-hanging ground fog. By modifying the `CloudSystem` Y-axis spawn logic, the clouds now hover at ground level, matching the target aesthetic perfectly.
+- **Visuals:**
+  - [GOAL.png](./GOAL.png)
+  - [verification_main_fog.png](./verification_main_fog.png) (Resulting Implementation)
+- **Implementation Journey:**
+  - Initialized as Nova and mapped the Vanilla JS/Three.js architecture.
+  - Replicated `GOAL.png` state in an isolated test environment (`main_test.js`) and experimented with Cloud altitude to simulate ground fog.
+  - Drafted Architectural Paths and selected the 'Standard' Approach (adjusting the existing `CloudSystem` logic).
+  - Modified `main.js` line 706 to change `y = 8 + Math.random() * 5` to `y = 0.5 + Math.random() * 1.5`.
+  - Executed a headless Playwright script against the updated `index.html` to generate `verification_main_fog.png`.
+  - Visually confirmed via `read_image_file` that the updated cloud positioning acts as fog and matches `GOAL.png`.
+- **Tradeoffs & Assumptions:**
+  - *Interpretations:* I interpreted the "fog" in `GOAL.png` as simply lowered versions of the existing `CloudSystem` rather than an entirely new particle or shader system (e.g. `THREE.Fog`).
+  - *Paths Brainstormed:* Standard (modify `y` in `CloudSystem`), Minimalist (hardcode `y = 0.5`), and Lateral (replace `CloudSystem` with `THREE.FogExp2`).
+  - *Chosen Route:* Standard Approach was chosen because it achieves the exact target visual, requires exactly 1 line of code change, perfectly adheres to the 'Simplicity First' and 'Surgical Changes' guardrails, and requires zero new dependencies or abstraction.
+- **Testing Instructions:**
+  1. Open `index.html` in any modern browser.
+  2. Observe the white, low-poly clouds slowly drifting across the screen.
+  3. Verify that the clouds hover near the grid level (ground fog) rather than floating high above the scene.
+- **Action Item:** `git push -u origin feature/nova-ground-fog && gh pr create --title "feat: Add Ground Fog" --body-file pr_manifest.log`
