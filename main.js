@@ -1209,6 +1209,19 @@ function resolveMerges(x, z) {
 
     if (cluster.length >= 3) {
         gameState.isBusy = true;
+
+        // Clear adjacent obstacles
+        cluster.forEach(cell => {
+            const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+            neighbors.forEach(([dx, dz]) => {
+                const nx = cell.x + dx;
+                const nz = cell.z + dz;
+                if (city.isValid(nx, nz) && city.grid[nx][nz] && city.grid[nx][nz].tier === -2) {
+                    city.remove(nx, nz);
+                }
+            });
+        });
+
         const focalPos = gridToWorld(x, z);
 
         let animationsComplete = 0;
@@ -1235,13 +1248,18 @@ function resolveMerges(x, z) {
 
             const mesh = city.meshGrid[cell.x][cell.z];
             if (mesh) {
+                // Detach mesh so city.remove doesn't trigger shrink animation
+                city.meshGrid[cell.x][cell.z] = null;
+                // Logically remove immediately to prevent phantom buildings
+                city.remove(cell.x, cell.z);
+
                 gsap.to(mesh.position, {
                     x: focalPos.x,
                     z: focalPos.z,
                     duration: 0.5,
                     ease: "power2.in",
                     onComplete: () => {
-                        city.remove(cell.x, cell.z);
+                        scene.remove(mesh);
                         onComplete();
                     }
                 });
