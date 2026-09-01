@@ -1,0 +1,19 @@
+- PR Title: feat: Implement State-Guarded UI HUD
+- The Problem Solved: The game was missing the Heads-Up Display showing Score, Population, and Next Tier as required by `GOAL.png`. This adds the UI to `index.html` and wires it to the game loop in `main.js`.
+- Visuals:
+  - [Current Interface Verification](/home/jules/verification/screenshots/verification.png) compared with `GOAL.png`.
+- Implementation Journey:
+  - [Step] Evaluated DOM elements present in index.html (verified `#ui` container).
+  - [Step] Checked game state logic in `main.js` (`city.score`, `city.buildingCount`, `gameState.nextTier`).
+  - [Step] Wrote architectural proposal satisfying Forced Variance.
+  - [Step] Implemented `updateUX()` in `main.js` with caching to prevent excessive repaints.
+  - [Step] Wired `updateUX()` into the main `animate()` loop.
+  - [Step] Wrote Playwright verification script to visually test and record UI behavior.
+- Tradeoffs & Assumptions:
+  - Evaluated three paths: State-guarded DOM updates, targeted Node tracking, and Canvas text overlay.
+  - Chosen Route: State-guarded DOM updates (Approach 1). Why: Most lightweight in terms of line count, easiest to add a11y attributes like `aria-live`, prevents 60fps DOM thrashing through simple variable caching.
+- Testing Instructions:
+  - Open `index.html` in a modern browser.
+  - Start playing the game by clicking on the grid.
+  - Observe that the Score, Population, and Next Tier fields in the top left corner update accurately based on your actions.
+- Action Item: `git checkout -b feature/nova-ui-hud` then commit and open PR.

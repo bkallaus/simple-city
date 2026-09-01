@@ -1516,6 +1516,29 @@ function resetGame() {
 // Render Loop
 const clock = new THREE.Clock();
 
+let lastScore = -1;
+let lastPop = -1;
+let lastTier = -1;
+
+function updateUX() {
+    const uiElement = document.getElementById('ui');
+    if (!uiElement) return;
+
+    if (city.score !== lastScore || city.buildingCount !== lastPop || gameState.nextTier !== lastTier) {
+        lastScore = city.score;
+        lastPop = city.buildingCount;
+        lastTier = gameState.nextTier;
+
+        uiElement.innerHTML = `
+            <div aria-live="polite" aria-atomic="true">
+                <div>Score: ${lastScore}</div>
+                <div>Population: ${lastPop}</div>
+                <div>Next Tier: <span id="next-tier">${lastTier}</span></div>
+            </div>
+        `;
+    }
+}
+
 function animate() {
     requestAnimationFrame(animate);
 
@@ -1526,7 +1549,7 @@ function animate() {
     particleSystem.update(dt);
     cloudSystem.update(dt);
 
-    // Update UI
+    updateUX();
 
     renderer.render(scene, camera);
 }
