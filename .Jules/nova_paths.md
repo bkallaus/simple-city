@@ -1,17 +1,21 @@
-# Phase 2: Architectural Approaches
+# Nova Architectural Paths: HUD Implementation (Forced Variance)
 
-## Problem 1: Phantom Buildings
-*Absorbed buildings remain logically in the grid during their 0.5s slide animation.*
+## Approach 1: State-Guarded Template Literal Injection (The Recommended Minimalist Path)
+**Concept:** Use a single state tracker variable to hold the last rendered values (score, population, nextTier). Inside the `animate()` loop, check if the current game state differs from the cached state. If so, update the `innerHTML` of the `<div id="ui">` with a single template literal containing the complete markup for Score, Population, and Next Tier.
+**Pros:**
+- Extremely simple (single DOM query, ~15 lines of code).
+- State-guarded optimization prevents redundant DOM repaints every frame (60fps).
+- Easily supports accessibility attributes (e.g., `aria-live`).
+**Cons:** Re-renders the entire `#ui` block rather than targeting individual text nodes.
 
-* **Path 1 (Standard):** Manually clear `city.grid[x][z]` and decrement `buildingCount` within the merge loop. Call `scene.remove()` upon animation completion. (Pros: Clear intent. Cons: Duplicates `city.remove` logic.)
-* **Path 2 (Minimalist - Selected):** Detach the mesh (`city.meshGrid[x][z] = null`) and immediately call `city.remove(x, z)`. This clears logical data synchronously but skips the default shrink animation, allowing the GSAP slide to play before `scene.remove()`. (Pros: Zero logic duplication, perfectly surgical.)
-* **Path 3 (Lateral):** Add `isMerging = true` to cell data. Filter out merging cells in all raycasting and game tick loops. (Pros: Preserves data until visually gone. Cons: Spreads state-checking logic across 4 different functions.)
+## Approach 2: Targeted DOM Node Initialization & Updates (Standard Path)
+**Concept:** During game initialization, fetch `<div id="ui">` and programmatically create and append individual HTML elements for Score (`<span id="score">`), Population (`<span id="population">`), and Next Tier (`<span id="next-tier">`). Inside the `animate()` loop, directly update their `innerText` or `textContent` properties.
+**Pros:** Highly targeted updates; doesn't wipe sibling DOM elements.
+**Cons:** Requires slightly more boilerplate code (storing element references globally or in a scoped object) and takes up more lines of code.
 
-## Problem 2: Obstacle Removal
-*Adjacent rocks (tier -2) are not cleared when a match-3 occurs.*
+## Approach 3: Lateral Canvas Overlay (Lateral/Creative Path)
+**Concept:** Abandon the `<div id="ui">` DOM element entirely. Instead, create a transparent 2D Canvas positioned absolutely over the Three.js WebGL rendering context. Use the Canvas API (`ctx.fillText`, `ctx.fillStyle`) to render the text frame-by-frame inside the `animate()` loop.
+**Pros:** Absolute alignment with the game's internal 60FPS tick, bypasses DOM rendering entirely.
+**Cons:** Overkill for simple text. Breaks out-of-the-box accessibility (screen readers can't read canvas pixels) and contradicts the existing CSS setup in `index.html`.
 
-* **Path 1 (Standard - Selected):** Iterate through the final `cluster` array before animating. Check 4 orthogonal neighbors for `tier === -2`. Collect unique obstacle coordinates in a Set and call `city.remove()` on them. (Pros: Highly localized, easy to reason about.)
-* **Path 2 (Minimalist):** Inject the obstacle check directly into the existing BFS `while` loop. If a neighbor is `tier === -2`, destroy it instantly. (Pros: Single loop pass. Cons: Might over-destroy if the cluster size ends up being < 3, requiring rollback logic.)
-* **Path 3 (Lateral):** Modify `updateRoads()` to act as a generic "grid cleanup" sweep that runs after every merge, sweeping for unattached obstacles. (Pros: Consolidates cleanup. Cons: Doesn't make logical sense for rocks, changes mechanics entirely.)
-
-**Decision:** I am proceeding with Path 2 for Phantom Buildings and Path 1 for Obstacle Removal to maintain surgical precision and strict adherence to the zero-build-step, vanilla JS constraints.
+**Decision:** I will proceed with **Approach 1** because it aligns with Pop City's constraints of absolute simplicity, avoids unnecessary abstractions, and implements the required optimization via a state-guard mechanism to prevent DOM thrashing inside the animation loop.
