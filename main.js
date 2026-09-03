@@ -1513,6 +1513,18 @@ function resetGame() {
 
 
 
+// UI Update Logic
+let currentDisplayTier = null;
+function updateUX() {
+    if (gameState.nextTier !== currentDisplayTier) {
+        currentDisplayTier = gameState.nextTier;
+        const nextTierDiv = document.getElementById('next-tier');
+        if (nextTierDiv) {
+            nextTierDiv.innerHTML = `Next Tier: ${currentDisplayTier}`;
+        }
+    }
+}
+
 // Render Loop
 const clock = new THREE.Clock();
 
@@ -1527,6 +1539,7 @@ function animate() {
     cloudSystem.update(dt);
 
     // Update UI
+    updateUX();
 
     renderer.render(scene, camera);
 }

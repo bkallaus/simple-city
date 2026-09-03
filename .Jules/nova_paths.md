@@ -1,17 +1,17 @@
-# Phase 2: Architectural Approaches
+- **Standard Approach:** React or similar framework for state management of UI.
+- **Minimalist Approach (Chosen):** Vanilla JS injection directly into existing `#ui` div, using a simple state-tracking variable (`currentDisplayTier`) in `main.js` to avoid redundant DOM updates in the animation loop.
+- **Lateral Approach:** Canvas-rendered text UI overlay in WebGL instead of DOM updates.
 
-## Problem 1: Phantom Buildings
-*Absorbed buildings remain logically in the grid during their 0.5s slide animation.*
+Chose the **Minimalist Approach** because Pop City has no build step and relies entirely on centralized vanilla JavaScript (`main.js`) and `index.html`. This avoids adding large external dependencies and aligns perfectly with the "Simplicity First" and "Surgical Changes" rules in NOVA_AGENT.md.
 
-* **Path 1 (Standard):** Manually clear `city.grid[x][z]` and decrement `buildingCount` within the merge loop. Call `scene.remove()` upon animation completion. (Pros: Clear intent. Cons: Duplicates `city.remove` logic.)
-* **Path 2 (Minimalist - Selected):** Detach the mesh (`city.meshGrid[x][z] = null`) and immediately call `city.remove(x, z)`. This clears logical data synchronously but skips the default shrink animation, allowing the GSAP slide to play before `scene.remove()`. (Pros: Zero logic duplication, perfectly surgical.)
-* **Path 3 (Lateral):** Add `isMerging = true` to cell data. Filter out merging cells in all raycasting and game tick loops. (Pros: Preserves data until visually gone. Cons: Spreads state-checking logic across 4 different functions.)
-
-## Problem 2: Obstacle Removal
-*Adjacent rocks (tier -2) are not cleared when a match-3 occurs.*
-
-* **Path 1 (Standard - Selected):** Iterate through the final `cluster` array before animating. Check 4 orthogonal neighbors for `tier === -2`. Collect unique obstacle coordinates in a Set and call `city.remove()` on them. (Pros: Highly localized, easy to reason about.)
-* **Path 2 (Minimalist):** Inject the obstacle check directly into the existing BFS `while` loop. If a neighbor is `tier === -2`, destroy it instantly. (Pros: Single loop pass. Cons: Might over-destroy if the cluster size ends up being < 3, requiring rollback logic.)
-* **Path 3 (Lateral):** Modify `updateRoads()` to act as a generic "grid cleanup" sweep that runs after every merge, sweeping for unattached obstacles. (Pros: Consolidates cleanup. Cons: Doesn't make logical sense for rocks, changes mechanics entirely.)
-
-**Decision:** I am proceeding with Path 2 for Phantom Buildings and Path 1 for Obstacle Removal to maintain surgical precision and strict adherence to the zero-build-step, vanilla JS constraints.
+### PR Manifest
+- PR Title: feat: Add Next Tier UI tracking
+- The Problem Solved: The Next Tier UI indicator was missing from the screen despite being tracked in backend logic, making gameplay unpredictable. The Next Tier UI is now displayed in the top left, fulfilling the visual requirement of `GOAL.png`.
+- Visuals: [Markdown links to screenshots would go here after frontend verification]
+- Implementation Journey:
+  - Added `<div id="next-tier" aria-live="polite" aria-atomic="true"></div>` to `#ui` in `index.html`.
+  - Created `updateUX()` in `main.js` to update DOM conditionally based on `gameState.nextTier`.
+  - Hooked `updateUX()` into the `animate()` loop.
+- Tradeoffs & Assumptions: Assumed the text formatting string "Next Tier: X" shown in `GOAL.png` applies accurately, and chose a DOM approach instead of a Canvas WebGL approach for simplicity and screen-reader accessibility.
+- Testing Instructions: Open `index.html` in a browser. Look for "Next Tier: 1" (or 2) in the top left. Clicking on valid grid tiles will advance the tier and the UI will immediately update.
+- Action Item: `git checkout -b feature/next-tier-ui && git commit -m "feat: Add Next Tier UI tracking" && gh pr create --title "feat: Add Next Tier UI tracking" --body-file .Jules/nova_paths.md`
