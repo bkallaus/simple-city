@@ -336,17 +336,22 @@ function getMaterial(type, params) {
 // The Procedural Building Generator
 function createBuildingMesh(tier) {
     // Clamp tier to 1-10
-    const t = Math.min(Math.max(tier, 1), 10);
+    let t = tier;
+    if (t > 0) t = Math.min(Math.max(tier, 1), 10);
 
     // Generate or Fetch Texture
     if (!ASSETS.textures[t]) {
-        const colorHex = PALETTE[t - 1];
-        const colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+        let colorStr = '#ffffff';
+        if (t > 0) {
+            const colorHex = PALETTE[t - 1];
+            colorStr = '#' + colorHex.toString(16).padStart(6, '0');
+        }
 
         if (t === -1) {
             ASSETS.textures[t] = TextureFactory.road();
         } else if (t === -2) {
              // Nature / Obstacle (No texture needed, using materials)
+             ASSETS.textures[t] = true; // placeholder so it doesn't trigger again
         } else if (t <= 3) {
             ASSETS.textures[t] = TextureFactory.residential(colorStr, '#feffdf'); // Light Yellow Windows
         } else if (t <= 6) {
@@ -896,7 +901,7 @@ function spawnObstacles() {
 spawnObstacles();
 
 // New Game State Logic
-const gameState = {
+var gameState = {
     nextTier: 1,
     isGameOver: false,
     isBusy: false

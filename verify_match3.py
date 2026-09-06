@@ -37,7 +37,7 @@ def run():
         page.screenshot(path="verification_match3_before.png")
 
         # Trigger resolveMerges on one of them
-        page.evaluate("resolveMerges(4, 5);")
+        page.evaluate("window.testResolveMerges = function(x, z) { resolveMerges(x, z); }; testResolveMerges(4, 5);")
 
         # Wait for animation (duration is 0.5s in gsap)
         time.sleep(1.5)
